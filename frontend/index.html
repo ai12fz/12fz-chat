@@ -434,6 +434,7 @@ const app = Vue.createApp({
             if (this.activeGroup && msg.group_id === this.activeGroup.id) {
               if (!this.messages.find(m => m.id === msg.id || (m.content === msg.content && m.sender_id === msg.sender_id && Math.abs(new Date(m.created_at) - new Date(msg.created_at)) < 2000))) {
                 this.messages.push(msg);
+                this.$nextTick(() => this.scrollBottom());
               }
             }
             // Update group's last_msg_at and re-sort
