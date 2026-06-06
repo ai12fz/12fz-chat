@@ -39,7 +39,7 @@ func main() {
 	hub := ws.NewHub()
 
 	// Init auth handler
-	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass)
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass, cfg.BotTokens)
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)

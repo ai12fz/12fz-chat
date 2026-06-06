@@ -17,13 +17,15 @@ type AuthHandler struct {
 	jwtSecret string
 	adminID   string
 	adminPass string
+	botTokens map[string]string // bot_id -> pre-shared token
 }
 
-func NewAuthHandler(jwtSecret, adminID, adminPass string) *AuthHandler {
+func NewAuthHandler(jwtSecret, adminID, adminPass string, botTokens map[string]string) *AuthHandler {
 	return &AuthHandler{
 		jwtSecret: jwtSecret,
 		adminID:   adminID,
 		adminPass: adminPass,
+		botTokens: botTokens,
 	}
 }
 
@@ -77,6 +79,13 @@ func (h *AuthHandler) generateToken(botID string, expire int64) (string, error) 
 
 // ValidateToken parses and validates a JWT token, returns bot_id
 func (h *AuthHandler) ValidateToken(token string) (string, error) {
+	// Check bot pre-shared tokens first
+	for botID, botToken := range h.botTokens {
+		if token == botToken {
+			return botID, nil
+		}
+	}
+
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("invalid token format")
