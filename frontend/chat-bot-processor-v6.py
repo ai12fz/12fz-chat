@@ -164,12 +164,12 @@ def on_message(ws, raw):
 
         # 如果消息里@了别的bot，不回复（避免抢答）
         for other_id in BOT_TOKENS:
-            if other_id != BOT_ID and (f"@{other_id}" in content or other_id in content):
+            if other_id != BOT_ID and f"@{other_id}" in content:
                 print(f"[bot] G{gid} {s}: skipped (@{other_id} is the target)", flush=True)
                 return
 
         # Check if this bot is explicitly mentioned
-        mentioned = f"@{BOT_ID}" in content or BOT_ID in content
+        mentioned = f"@{BOT_ID}" in content
 
         print(f"[bot] G{gid} {s}: {content[:80]}{' [MENTIONED]' if mentioned else ''}", flush=True)
         reply = generate_reply(content, force_reply=mentioned)
