@@ -6,16 +6,23 @@ import (
 )
 
 type Config struct {
-	Port      int
-	PGConnStr string
-	JWTSecret string
+	Port       int
+	PGConnStr  string
+	JWTSecret  string
+	AdminBotID string
+	AdminPass  string
 }
+
+// PGConnStr method to satisfy db.Connect interface
+func (c *Config) PGConnStr() string { return c.PGConnStr }
 
 func Load() *Config {
 	return &Config{
-		Port:      getEnvInt("PORT", 8081),
-		PGConnStr: getEnv("PG_CONN", "postgresql://gong3:Cx99w06020354@localhost:5432/suzao?sslmode=disable"),
-		JWTSecret: getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
+		Port:       getEnvInt("PORT", 8081),
+		PGConnStr:  getEnv("PG_CONN", "postgresql://gong3:***@localhost:5432/suzao?sslmode=disable"),
+		JWTSecret:  getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
+		AdminBotID: getEnv("ADMIN_BOT_ID", "admin"),
+		AdminPass:  getEnv("ADMIN_PASS", "admin123"),
 	}
 }
 

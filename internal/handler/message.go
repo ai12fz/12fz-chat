@@ -44,6 +44,11 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 		log.Printf("[handler] save msg error: %v", err)
 		return
 	}
+	
+	// Update last_msg_at
+	if err := h.db.UpdateGroupLastMsg(ctx, msg.GroupID); err != nil {
+		log.Printf("[handler] update last_msg_at error: %v", err)
+	}
 
 	// Get group members for delivery
 	members, err := h.db.GetMembers(ctx, msg.GroupID)

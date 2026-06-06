@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12FZ 数造科技 · 聊天</title>
+<script src="/vue.global.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f4f6f9;height:100vh;overflow:hidden;color:#333}
+/* Login */
+.login-page{display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#3c8dbc,#367fa9)}
+.login-box{background:#fff;padding:40px;border-radius:8px;box-shadow:0 2px 20px rgba(0,0,0,.15);width:380px;text-align:center}
+.login-box h1{font-size:24px;color:#3c8dbc;margin-bottom:8px}
+.login-box p{color:#666;margin-bottom:24px;font-size:14px}
+.login-box input{width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:4px;font-size:14px;margin-bottom:12px;outline:0;transition:border-color .2s}
+.login-box input:focus{border-color:#3c8dbc}
+.login-box .error{color:#dc3545;font-size:13px;margin-bottom:12px}
+.login-box button{width:100%;padding:10px;background:#3c8dbc;color:#fff;border:none;border-radius:4px;font-size:15px;cursor:pointer;transition:background .2s}
+.login-box button:hover{background:#367fa9}
+.login-box button:disabled{opacity:.6;cursor:not-allowed}
+/* Layout */
+.app-layout{display:flex;height:100vh}
+.sidebar{width:260px;background:#222d32;color:#b8c7ce;display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#1a2226;border-bottom:1px solid #2c3b41}
+.sidebar-header h2{font-size:16px;color:#fff;font-weight:400}
+.user-badge{font-size:12px;background:#3c8dbc;color:#fff;padding:3px 8px;border-radius:3px;cursor:pointer}
+.user-badge:hover{background:#367fa9}
+.sidebar-tabs{display:flex;border-bottom:1px solid #2c3b41}
+.sidebar-tabs button{flex:1;padding:10px 0;background:transparent;border:none;color:#8aa4af;cursor:pointer;font-size:13px;transition:all .2s}
+.sidebar-tabs button.active{color:#fff;background:#2c3b41}
+.search-bar{padding:10px;border-bottom:1px solid #2c3b41}
+.search-bar input{width:100%;padding:7px 10px;background:#2c3b41;border:1px solid #3a4a52;color:#fff;border-radius:3px;font-size:13px;outline:0}
+.search-bar input::placeholder{color:#6a7f8a}
+.group-list{flex:1;overflow-y:auto}
+.group-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid #2c3b41;transition:background .15s}
+.group-item:hover{background:#2c3b41}
+.group-item.active{background:#3c8dbc;color:#fff}
+.group-item .group-name{font-size:14px;color:#e0e0e0;margin-bottom:3px}
+.group-item.active .group-name{color:#fff}
+.group-item .group-preview{font-size:11px;color:#6a7f8a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-item .group-time{float:right;font-size:11px;color:#6a7f8a;margin-top:2px}
+.group-item .badge{float:right;background:#f39c12;color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;margin-left:6px;margin-top:1px}
+.group-item.active .badge{background:#fff;color:#3c8dbc}
+.sidebar-footer{padding:10px 16px;border-top:1px solid #2c3b41;font-size:12px;display:flex;gap:8px}
+.sidebar-footer button{background:#2c3b41;color:#b8c7ce;border:none;padding:6px 10px;border-radius:3px;cursor:pointer;font-size:12px;transition:background .2s}
+.sidebar-footer button:hover{background:#3a4a52}
+/* Main Chat */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.chat-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#fff;border-bottom:1px solid #ddd;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.chat-header .group-title{font-size:16px;font-weight:500;color:#333}
+.chat-header .group-meta{font-size:12px;color:#999}
+.chat-header .header-actions button{background:transparent;border:1px solid #ddd;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px;color:#666;transition:all .2s}
+.chat-header .header-actions button:hover{background:#f5f5f5;color:#333}
+.messages{flex:1;overflow-y:auto;padding:20px;background:#fff;display:flex;flex-direction:column;gap:10px}
+.empty-msg{text-align:center;color:#999;margin-top:60px;font-size:14px}
+.msg{max-width:70%;padding:9px 14px;border-radius:12px;font-size:14px;line-height:1.5;word-break:break-word;position:relative}
+.msg.self{align-self:flex-end;background:#3c8dbc;color:#fff;border-bottom-right-radius:4px}
+.msg.other{align-self:flex-start;background:#f1f1f1;color:#333;border-bottom-left-radius:4px}
+.msg .sender{font-size:11px;opacity:.8;margin-bottom:3px}
+.msg .time{font-size:10px;opacity:.6;margin-top:4px;text-align:right}
+.input-area{display:flex;align-items:flex-end;padding:12px 20px;background:#fff;border-top:1px solid #e0e0e0;gap:10px}
+.input-area textarea{flex:1;resize:none;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:0;min-height:40px;max-height:120px;line-height:1.5;transition:border-color .2s}
+.input-area textarea:focus{border-color:#3c8dbc}
+.input-area .enter-hint{font-size:11px;color:#aaa;white-space:nowrap align-self:center}
+.input-area button{padding:8px 20px;background:#3c8dbc;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;transition:background .2s;white-space:nowrap;height:40px}
+.input-area button:hover{background:#367fa9}
+.input-area button:disabled{opacity:.5;cursor:not-allowed}
+/* Modals */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:#fff;border-radius:8px;padding:24px;width:400px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.modal h3{margin-bottom:16px;font-size:16px;color:#333}
+.modal input{width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:4px;font-size:14px;margin-bottom:12px;outline:0}
+.modal input:focus{border-color:#3c8dbc}
+.modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.modal .actions button{padding:7px 16px;border-radius:4px;font-size:13px;cursor:pointer}
+.modal .btn-cancel{background:#f5f5f5;border:1px solid #ddd;color:#666}
+.modal .btn-confirm{background:#3c8dbc;border:none;color:#fff}
+.modal .btn-confirm:hover{background:#367fa9}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 登录页 -->
+  <div class="login-page" v-if="!token">
+    <div class="login-box">
+      <h1>12FZ 数造科技</h1>
+      <p>请登录后使用聊天系统</p>
+      <div class="error" v-if="loginError">{{ loginError }}</div>
+      <input v-model="loginForm.username" placeholder="用户名" @keyup.enter="doLogin">
+      <input v-model="loginForm.password" type="password" placeholder="密码" @keyup.enter="doLogin">
+      <button @click="doLogin" :disabled="loggingIn">{{ loggingIn ? '登录中...' : '登录' }}</button>
+    </div>
+  </div>
+
+  <!-- 聊天界面 -->
+  <div class="app-layout" v-else>
+    <!-- 侧栏 -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>12FZ 聊天</h2>
+        <span class="user-badge" @click="showLogout = true">{{ currentBot }}</span>
+      </div>
+      <div class="sidebar-tabs">
+        <button :class="{active: chatTab==='msgs'}" @click="chatTab='msgs'">消息</button>
+        <button :class="{active: chatTab==='friends'}" @click="chatTab='friends'">好友</button>
+      </div>
+      <div class="search-bar">
+        <input v-model="keyword" placeholder="搜索群组名称">
+      </div>
+      <div class="group-list" v-if="chatTab==='msgs'">
+        <div v-for="g in filteredGroups" :key="g.id"
+          class="group-item"
+          :class="{active: activeGroup && activeGroup.id === g.id}"
+          @click="switchGroup(g)">
+          <div class="group-name">{{ g.name }}</div>
+          <div class="group-preview">
+            <span class="group-time">{{ timeAgo(g.last_msg_at) }}</span>
+          </div>
+          <span class="badge" v-if="unreadCount[g.id]">{{ unreadCount[g.id] }}</span>
+        </div>
+      </div>
+      <div class="group-list" v-else>
+        <div v-for="f in friends" :key="f.friend_id" class="group-item">
+          <div class="group-name">{{ f.friend_id }}</div>
+          <div class="group-preview">{{ statusText(f.status) }}</div>
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <button @click="showCreateGroup=true">创建群组</button>
+        <button @click="showAddFriend=true">添加好友</button>
+      </div>
+    </div>
+
+    <!-- 主区域 -->
+    <div class="main">
+      <div class="chat-header" v-if="activeGroup">
+        <div>
+          <div class="group-title">{{ activeGroup.name }}</div>
+          <div class="group-meta">ID: {{ activeGroup.id }}</div>
+        </div>
+        <div class="header-actions">
+          <button @click="showGroupInfo=true">群信息</button>
+        </div>
+      </div>
+      <div class="chat-header" v-else>
+        <div class="group-title">选择一个群组开始聊天</div>
+      </div>
+
+      <div class="messages" ref="msgContainer" v-if="activeGroup">
+        <div class="empty-msg" v-if="messages.length === 0">暂无消息，开始聊天吧</div>
+        <div v-for="m in messages" :key="m.id"
+          class="msg"
+          :class="m.sender_id === currentBot ? 'self' : 'other'">
+          <div class="sender" v-if="m.sender_id !== currentBot">{{ m.sender_id }}</div>
+          <div>{{ m.content }}</div>
+          <div class="time">{{ formatTime(m.created_at) }}</div>
+        </div>
+      </div>
+      <div class="messages" v-else>
+        <div class="empty-msg">请从左侧选择一个群组</div>
+      </div>
+
+      <div class="input-area" v-if="activeGroup">
+        <textarea v-model="inputText" rows="1"
+          placeholder="输入消息..."
+          @keydown="handleKeydown"
+          @input="autoResize"></textarea>
+        <div class="enter-hint" style="font-size:11px;color:#aaa;align-self:center">Enter 发送</div>
+        <button @click="sendMessage" :disabled="!connected || !inputText.trim()">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 退出确认 -->
+  <div class="modal-overlay" v-if="showLogout" @click.self="showLogout=false">
+    <div class="modal">
+      <h3>退出登录</h3>
+      <p style="color:#666;font-size:14px">确认退出登录？</p>
+      <div class="actions">
+        <button class="btn-cancel" @click="showLogout=false">取消</button>
+        <button class="btn-confirm" @click="doLogout">退出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 创建群组 -->
+  <div class="modal-overlay" v-if="showCreateGroup" @click.self="showCreateGroup=false">
+    <div class="modal">
+      <h3>创建群组</h3>
+      <input v-model="newGroupName" placeholder="群组名称" @keyup.enter="createGroup">
+      <div class="actions">
+        <button class="btn-cancel" @click="showCreateGroup=false">取消</button>
+        <button class="btn-confirm" @click="createGroup">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加成员 -->
+  <div class="modal-overlay" v-if="showAddMember" @click.self="showAddMember=false">
+    <div class="modal">
+      <h3>添加成员到「{{ activeGroup ? activeGroup.name : '' }}」</h3>
+      <input v-model="newMemberId" placeholder="用户ID (如 admin)" @keyup.enter="addMember">
+      <div class="actions">
+        <button class="btn-cancel" @click="showAddMember=false">取消</button>
+        <button class="btn-confirm" @click="addMember">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加好友 -->
+  <div class="modal-overlay" v-if="showAddFriend" @click.self="showAddFriend=false">
+    <div class="modal">
+      <h3>添加好友</h3>
+      <input v-model="newFriendId" placeholder="用户ID" @keyup.enter="addFriend">
+      <div class="actions">
+        <button class="btn-cancel" @click="showAddFriend=false">取消</button>
+        <button class="btn-confirm" @click="addFriend">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 群信息 -->
+  <div class="modal-overlay" v-if="showGroupInfo" @click.self="showGroupInfo=false">
+    <div class="modal" v-if="activeGroup">
+      <h3>群组信息</h3>
+      <p style="font-size:14px;margin-bottom:12px">名称: {{ activeGroup.name }}</p>
+      <p style="font-size:14px;margin-bottom:12px">ID: {{ activeGroup.id }}</p>
+      <p style="font-size:14px;margin-bottom:12px">创建者: {{ activeGroup.created_by }}</p>
+      <p style="font-size:14px;margin-bottom:12px;font-weight:500">成员 ({{ groupMembers.length }})</p>
+      <div v-for="m in groupMembers" :key="m.bot_id" style="font-size:13px;padding:6px 0;border-bottom:1px solid #f0f0f0">
+        <span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:#3c8dbc;color:#fff;border-radius:50%;font-size:12px;margin-right:8px">{{ m.bot_id.charAt(0).toUpperCase() }}</span>
+        {{ m.bot_id }}{{ m.role === 'admin' ? '（管理员）' : '（成员）' }}
+      </div>
+      <div class="actions">
+        <button class="btn-cancel" @click="showGroupInfo=false">关闭</button>
+        <button class="btn-confirm" @click="showAddMember=true;showGroupInfo=false">添加成员</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WS状态指示器 -->
+  <div style="position:fixed;bottom:50px;right:16px;z-index:99">
+    <span v-if="!connected" style="font-size:12px;color:#dc3545;background:#fff;padding:4px 10px;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.2)">
+      🔴 连接断开
+    </span>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let socket = null;
+const TOKEN_KEY = 'chat_token';
+const BOT_ID_KEY = 'chat_bot_id';
+
+const app = Vue.createApp({
+  data() {
+    return {
+      // Auth
+      token: localStorage.getItem(TOKEN_KEY) || '',
+      currentBot: localStorage.getItem(BOT_ID_KEY) || 'admin',
+      loginForm: { username: '', password: '' },
+      loginError: '',
+      loggingIn: false,
+      showLogout: false,
+
+      // Chat state
+      chatTab: 'msgs',
+      connected: false,
+      connecting: false,
+      groups: [],
+      activeGroup: null,
+      unreadCount: {},
+      messages: [],
+      groupMembers: [],
+      friends: [],
+      inputText: '',
+      keyword: '',
+      enterMode: 1,
+
+      // Modals
+      showCreateGroup: false,
+      showAddMember: false,
+      showAddFriend: false,
+      showGroupInfo: false,
+      newGroupName: '',
+      newMemberId: '',
+      newFriendId: '',
+    };
+  },
+  computed: {
+    filteredGroups() {
+      const kw = this.keyword.trim().toLowerCase();
+      // Sort by last_msg_at DESC (newest first), with unread at top
+      let list = [...this.groups];
+      if (kw) list = list.filter(g => g.name.toLowerCase().includes(kw));
+      return list;
+    }
+  },
+  watch: {
+    showGroupInfo(val) { if (val && this.activeGroup) this.loadGroupMembers(); },
+    token(val) {
+      if (val) {
+        localStorage.setItem(TOKEN_KEY, val);
+        this.connectWS();
+        this.loadGroups();
+        this.loadFriends();
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(BOT_ID_KEY);
+      }
+    }
+  },
+  mounted() {
+    if (this.token) {
+      this.connectWS();
+      this.loadGroups();
+      this.loadFriends();
+    }
+  },
+  methods: {
+    async api(path, opts = {}) {
+      try {
+        const headers = { 'Content-Type': 'application/json', ...opts.headers };
+        if (this.token) headers['Authorization'] = 'Bearer ' + this.token;
+        const res = await fetch(API + path, { ...opts, headers });
+        const data = await res.json();
+        return data;
+      } catch(e) { return null; }
+    },
+
+    // ── Auth ──
+    async doLogin() {
+      if (!this.loginForm.username || !this.loginForm.password) {
+        this.loginError = '请输入用户名和密码';
+        return;
+      }
+      this.loggingIn = true;
+      this.loginError = '';
+      try {
+        const res = await this.api('/api/login', {
+          method: 'POST',
+          body: JSON.stringify(this.loginForm)
+        });
+        if (res && res.token) {
+          this.token = res.token;
+          this.currentBot = res.bot_id;
+          localStorage.setItem(BOT_ID_KEY, res.bot_id);
+          this.loginForm = { username: '', password: '' };
+        } else {
+          this.loginError = (res && res.error) || '登录失败';
+        }
+      } catch(e) {
+        this.loginError = '网络错误';
+      }
+      this.loggingIn = false;
+    },
+    doLogout() {
+      this.token = '';
+      this.currentBot = '';
+      this.groups = [];
+      this.activeGroup = null;
+      this.messages = [];
+      this.showLogout = false;
+      if (socket) { socket.close(); socket = null; }
+    },
+
+    // ── Data ──
+    async loadGroups() {
+      const d = await this.api('/api/groups');
+      if (Array.isArray(d)) {
+        this.groups = d;
+        // Also load unread counts
+        this.loadUnread();
+      }
+    },
+    async loadUnread() {
+      // Load unread counts from the API
+      const d = await this.api('/api/messages/unread?bot_id=' + this.currentBot);
+      if (d && typeof d === 'object') {
+        this.unreadCount = d;
+      }
+    },
+    async loadFriends() {
+      const d = await this.api('/api/friends/' + this.currentBot);
+      if (Array.isArray(d)) this.friends = d;
+    },
+    async switchGroup(g) {
+      this.activeGroup = g;
+      this.messages = [];
+      const d = await this.api('/api/messages?group_id=' + g.id + '&limit=50');
+      if (Array.isArray(d)) this.messages = d;
+      this.loadGroupMembers();
+      // Mark as read
+      if (this.messages.length > 0) {
+        const lastId = this.messages[this.messages.length - 1].id;
+        await this.api('/api/messages/read', {
+          method: 'POST',
+          body: JSON.stringify({ group_id: g.id, last_read_msg_id: lastId })
+        });
+        this.unreadCount = { ...this.unreadCount, [g.id]: 0 };
+      }
+    },
+    async loadGroupMembers() {
+      if (!this.activeGroup) return;
+      const d = await this.api('/api/groups/' + this.activeGroup.id + '/members');
+      if (Array.isArray(d)) this.groupMembers = d;
+    },
+    statusText(s) { return {pending:'待确认',approved:'已通过',blocked:'已屏蔽'}[s]||s; },
+
+    // ── WebSocket ──
+    connectWS() {
+      if (this.connecting || !this.token) return;
+      this.connecting = true;
+      const proto = API.startsWith('https') ? 'wss://' : 'ws://';
+      const host = API.replace(/^https?:\/\//, '');
+      const wsUrl = proto + host + '/ws?token=' + this.token;
+      socket = new WebSocket(wsUrl);
+      socket.onopen = () => { this.connected = true; this.connecting = false; };
+      socket.onmessage = (e) => {
+        try {
+          const pkt = JSON.parse(e.data);
+          if (pkt.type === 'hello' || pkt.type === 'event') return;
+          if (pkt.type === 'message' && pkt.data) {
+            const msg = {
+              id: pkt.data.id || Date.now(),
+              group_id: pkt.data.group_id,
+              sender_id: pkt.data.sender_id,
+              content: pkt.data.content,
+              msg_type: pkt.data.msg_type || 'text',
+              created_at: pkt.data.send_at
+            };
+            // Dedup: only add if message ID not already in list
+            if (this.activeGroup && msg.group_id === this.activeGroup.id) {
+              if (!this.messages.find(m => m.id === msg.id || (m.content === msg.content && m.sender_id === msg.sender_id && Math.abs(new Date(m.created_at) - new Date(msg.created_at)) < 2000))) {
+                this.messages.push(msg);
+              }
+            }
+            // Update group's last_msg_at and re-sort
+            const g = this.groups.find(gr => gr.id === msg.group_id);
+            if (g) {
+              g.last_msg_at = msg.created_at;
+              // Move to top (re-sort)
+              this.groups.sort((a, b) => new Date(b.last_msg_at) - new Date(a.last_msg_at));
+            }
+          }
+        } catch(err){}
+      };
+      socket.onclose = () => {
+        this.connected = false;
+        this.connecting = false;
+        setTimeout(() => this.connectWS(), 3000);
+      };
+    },
+
+    // ── Input ──
+    autoResize(e) {
+      const el = e.target;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    },
+    handleKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.sendMessage();
+      }
+    },
+    async sendMessage() {
+      const text = this.inputText.trim();
+      if (!text || !this.activeGroup || !this.connected) return;
+      this.inputText = '';
+      const res = await this.api('/api/messages', {
+        method: 'POST',
+        body: JSON.stringify({ group_id: this.activeGroup.id, content: text })
+      });
+      // Don't push locally - WS broadcast will handle it
+      // But if WS is slow, show optimistic
+      if (res && res.id) {
+        // Check if WS already added it (dedup)
+        if (!this.messages.find(m => m.id === res.id)) {
+          this.messages.push({
+            id: res.id,
+            group_id: this.activeGroup.id,
+            sender_id: this.currentBot,
+            content: text,
+            msg_type: 'text',
+            created_at: res.created_at
+          });
+        }
+      }
+      this.$nextTick(() => this.scrollBottom());
+    },
+
+    // ── Group Management ──
+    async createGroup() {
+      const name = this.newGroupName.trim();
+      if (!name) return;
+      const d = await this.api('/api/groups', { method:'POST', body: JSON.stringify({ name }) });
+      if (d && d.id) {
+        this.groups.unshift(d);
+        this.showCreateGroup = false;
+        this.newGroupName = '';
+        this.switchGroup(d);
+      }
+    },
+    async addMember() {
+      if (!this.newMemberId.trim() || !this.activeGroup) return;
+      await this.api('/api/groups/' + this.activeGroup.id + '/members', {
+        method:'POST',
+        body: JSON.stringify({ bot_id: this.newMemberId, role: 'member' })
+      });
+      this.showAddMember = false;
+      this.newMemberId = '';
+      this.loadGroupMembers();
+    },
+    async addFriend() {
+      const id = this.newFriendId.trim();
+      if (!id) return;
+      await this.api('/api/friends', {
+        method:'POST',
+        body: JSON.stringify({ user_id: this.currentBot, friend_id: id })
+      });
+      this.showAddFriend = false;
+      this.newFriendId = '';
+      this.loadFriends();
+    },
+
+    // ── Utils ──
+    scrollBottom() {
+      this.$nextTick(() => {
+        const el = this.$refs.msgContainer;
+        if (el) setTimeout(() => { el.scrollTop = el.scrollHeight; }, 80);
+      });
+    },
+    formatTime(t) {
+      if (!t) return '';
+      const d = new Date(t);
+      const pad = n => String(n).padStart(2,'0');
+      return pad(d.getHours()) + ':' + pad(d.getMinutes());
+    },
+    timeAgo(t) {
+      if (!t) return '';
+      const now = new Date();
+      const d = new Date(t);
+      const diff = Math.floor((now - d) / 1000);
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff/60) + '分钟前';
+      if (diff < 86400) return Math.floor(diff/3600) + '小时前';
+      return Math.floor(diff/86400) + '天前';
+    }
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

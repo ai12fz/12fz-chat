@@ -38,18 +38,25 @@ func main() {
 	// Init hub
 	hub := ws.NewHub()
 
+	// Init auth handler
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass)
+
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
-	httpHandler := handler.NewHTTPHandler(database)
+	httpHandler := handler.NewHTTPHandler(database, hub, authHandler)
 
 	// Setup router
 	r := mux.NewRouter()
 
-	// Health check
+	// Health check (public)
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
 
-	// REST API
+	// Login (public)
+	r.HandleFunc("/api/login", authHandler.Login).Methods("POST")
+
+	// REST API (authenticated)
 	api := r.PathPrefix("/api").Subrouter()
+	api.Use(httpHandler.AuthMiddleware)
 	api.HandleFunc("/groups", httpHandler.CreateGroup).Methods("POST")
 	api.HandleFunc("/groups", httpHandler.ListGroups).Methods("GET")
 	api.HandleFunc("/groups/{id}/members", httpHandler.GetMembers).Methods("GET")
@@ -57,18 +64,29 @@ func main() {
 	api.HandleFunc("/groups/my", httpHandler.GetMyGroups).Methods("GET")
 	api.HandleFunc("/messages", httpHandler.GetMessages).Methods("GET")
 	api.HandleFunc("/messages", httpHandler.SendMessage).Methods("POST")
+	api.HandleFunc("/messages/unread", httpHandler.GetUnreadCount).Methods("GET")
+	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 
-	// WebSocket - bot connects here
+	// WebSocket - token-based auth
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		botID := r.URL.Query().Get("bot_id")
-		if botID == "" {
-			http.Error(w, "missing bot_id", 400)
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			http.Error(w, "missing token", 401)
 			return
 		}
+		botID, err := authHandler.ValidateToken(token)
+		if err != nil {
+			http.Error(w, "invalid token: "+err.Error(), 401)
+			return
+		}
+		log.Printf("[chat] WS connect: bot_id=%s", botID)
 		hub.ServeWS(w, r, botID, msgHandler)
 	})
+
+	// Serve static frontend
+	r.PathPrefix("/").Handler(httpHandler.StaticHandler())
 
 	// Apply CORS
 	srv := &http.Server{
