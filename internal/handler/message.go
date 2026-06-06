@@ -67,9 +67,10 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 		SendAt:   m.CreatedAt,
 	}
 
+	chatMsgJSON, _ := json.Marshal(chatMsg)
 	broadcastData, _ := json.Marshal(ws.WSMessage{
 		Type: "message",
-		Data: mustJSON(chatMsg),
+		Data: json.RawMessage(chatMsgJSON),
 	})
 
 	var botIDs []string
@@ -77,9 +78,4 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 		botIDs = append(botIDs, member.BotID)
 	}
 	h.hub.SendToGroup(m.GroupID, broadcastData, botIDs)
-}
-
-func mustJSON(v any) json.RawMessage {
-	b, _ := json.Marshal(v)
-	return b
 }

@@ -1,0 +1,29 @@
+--- internal/config/config.go
++++ internal/config/config.go
+@@ -12,9 +12,9 @@
+ 	AdminPass  string
+ }
+ 
+-// PGConnStr method to satisfy db.Connect interface
+-func (c *Config) PGConnStr() string { return c.PGConnStr }
++// GetPGConnStr method to satisfy db.Connect interface
++func (c *Config) GetPGConnStr() string { return c.PGConnStr }
+ 
+ func Load() *Config {
+ 	return &Config{
+--- a/internal/db/db.go
++++ b/internal/db/db.go
+@@ -13,11 +13,11 @@
+ 	pool *pgxpool.Pool
+ }
+ 
+-func Connect(cfg interface{ PGConnStr() string }) (*DB, error) {
++func Connect(cfg interface{ GetPGConnStr() string }) (*DB, error) {
+ 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+ 	defer cancel()
+ 
+-	pool, err := pgxpool.New(ctx, cfg.PGConnStr())
++	pool, err := pgxpool.New(ctx, cfg.GetPGConnStr())
+ 	if err != nil {
+ 		return nil, fmt.Errorf("pg connect: %w", err)
+ 	}

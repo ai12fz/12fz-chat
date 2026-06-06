@@ -13,8 +13,8 @@ type Config struct {
 	AdminPass  string
 }
 
-// PGConnString method to satisfy db.Connect interface
-func (c *Config) PGConnString() string { return c.PGConnStr }
+// PGConnStr method to satisfy db.Connect interface
+func (c *Config) PGConnStr() string { return c.PGConnStr }
 
 func Load() *Config {
 	return &Config{

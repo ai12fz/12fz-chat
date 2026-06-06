@@ -13,11 +13,11 @@ type DB struct {
 	pool *pgxpool.Pool
 }
 
-func Connect(cfg interface{ PGConnStr() string }) (*DB, error) {
+func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, cfg.PGConnStr())
+	pool, err := pgxpool.New(ctx, cfg.PGConnString())
 	if err != nil {
 		return nil, fmt.Errorf("pg connect: %w", err)
 	}
