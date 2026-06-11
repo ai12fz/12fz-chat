@@ -41,7 +41,7 @@ async function handleLogin() {
     await auth.login(username.value, password.value)
     router.push('/chat')
   } catch (e: any) {
-    error.value = e.response?.data?.msg || '登录失败'
+    error.value = e.response?.data?.error || '登录失败'
   } finally {
     loading.value = false
   }

@@ -12,7 +12,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { useWebSocket } from '../composables/useWebSocket'
-import { getGroups, getContacts } from '../api'
+import { getMyGroups, getUnreadCounts } from '../api'
 import SidebarLeft from '../components/SidebarLeft.vue'
 import ChatContent from '../components/ChatContent.vue'
 import SidebarRight from '../components/SidebarRight.vue'
@@ -28,24 +28,34 @@ onMounted(async () => {
     return
   }
 
+  // Connect WebSocket
   ws.connect(auth.token)
 
-  const [groups, contacts] = await Promise.all([
-    getGroups(),
-    getContacts(),
-  ])
+  try {
+    // Load groups
+    const groups = await getMyGroups()
+    let firstId = ''
 
-  groups.forEach((g: any) => chat.addSession({
-    id: `group:${g.id}`, name: g.name, type: 'group',
-    unread: g.unread || 0, lastMsg: g.lastMsg, messages: [],
-  }))
+    groups.forEach((g: any) => {
+      chat.ensureGroupSession(g)
+      if (!firstId) firstId = chat.groupSessionId(g.id)
+    })
 
-  contacts.forEach((c: any) => chat.addSession({
-    id: `user:${c.id}`, name: c.username, type: 'user',
-    unread: c.unread || 0, online: c.online, messages: [],
-  }))
+    // Load unread counts
+    try {
+      const unreads = await getUnreadCounts()
+      for (const [groupIdStr, count] of Object.entries(unreads)) {
+        const sid = chat.groupSessionId(Number(groupIdStr))
+        const s = chat.sessions.find(s => s.id === sid)
+        if (s) s.unread = count as number
+      }
+    } catch { /* unread endpoint may not have data */ }
 
-  if (groups.length) chat.setActive(`group:${groups[0].id}`)
+    // Select first session
+    if (firstId) chat.setActive(firstId)
+  } catch (err) {
+    console.error('Failed to load chat data:', err)
+  }
 })
 </script>
 

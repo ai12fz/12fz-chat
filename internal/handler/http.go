@@ -62,14 +62,14 @@ func getBotID(r *http.Request) string {
 	return ""
 }
 
-// StaticHandler serves the frontend HTML and assets
+// StaticHandler serves the frontend HTML and assets from frontend/dist/
 func (h *HTTPHandler) StaticHandler() http.Handler {
-	fs := http.FileServer(http.Dir("frontend"))
+	fs := http.FileServer(http.Dir("frontend/dist"))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// For SPA: serve index.html for all non-API, non-WS routes
 		path := r.URL.Path
 		if path == "/" || path == "" {
-			http.ServeFile(w, r, "frontend/index.html")
+			http.ServeFile(w, r, "frontend/dist/index.html")
 			return
 		}
 		// Serve static files if they exist

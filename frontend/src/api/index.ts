@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/api',
   timeout: 10000,
 })
 
@@ -16,6 +16,7 @@ api.interceptors.response.use(
   err => {
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
+      localStorage.removeItem('user')
       window.location.href = '/login'
     }
     return Promise.reject(err)
@@ -24,24 +25,70 @@ api.interceptors.response.use(
 
 export default api
 
+// ── Auth ──
+
 export async function login(username: string, password: string) {
-  const { data } = await api.post('/auth/login', { username, password })
-  return data.data
+  const { data } = await api.post('/login', { username, password })
+  return data // { token, bot_id, expire }
 }
 
-export async function getGroups() {
-  const { data } = await api.get('/groups')
-  return data.data
+// ── Groups ──
+
+export async function getMyGroups() {
+  const { data } = await api.get('/groups/my')
+  // data = [{ id, name, created_by, created_at, last_msg_at }]
+  return data
 }
 
-export async function getContacts() {
-  const { data } = await api.get('/contacts')
-  return data.data
+export async function getGroupMembers(groupId: number) {
+  const { data } = await api.get(`/groups/${groupId}/members`)
+  // data = [{ group_id, bot_id, role, joined_at }]
+  return data
 }
 
-export async function getMessages(target: string, before?: string) {
-  const params: any = { target }
-  if (before) params.before = before
-  const { data } = await api.get('/messages', { params })
-  return data.data
+export async function createGroup(name: string) {
+  const { data } = await api.post('/groups', { name })
+  return data
+}
+
+// ── Messages ──
+
+export async function getMessages(groupId: number, limit = 50, offset = 0) {
+  const { data } = await api.get('/messages', {
+    params: { group_id: groupId, limit, offset },
+  })
+  // data = [{ id, group_id, sender_id, content, msg_type, created_at }]
+  return data
+}
+
+export async function sendMessage(groupId: number, content: string) {
+  const { data } = await api.post('/messages', { group_id: groupId, content })
+  return data
+}
+
+export async function getUnreadCounts() {
+  const { data } = await api.get('/messages/unread')
+  // data = { <group_id>: <count>, ... }
+  return data
+}
+
+export async function markRead(groupId: number, lastReadMsgId: number) {
+  const { data } = await api.post('/messages/read', {
+    group_id: groupId,
+    last_read_msg_id: lastReadMsgId,
+  })
+  return data
+}
+
+// ── Friends ──
+
+export async function getFriends(userId: string) {
+  const { data } = await api.get(`/friends/${userId}`)
+  // data = [{ user_id, friend_id, status, created_at }]
+  return data
+}
+
+export async function addFriend(userId: string, friendId: string) {
+  const { data } = await api.post('/friends', { user_id: userId, friend_id: friendId })
+  return data
 }
