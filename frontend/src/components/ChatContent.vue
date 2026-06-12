@@ -24,7 +24,8 @@
           <div class="msg-body">
             <div class="msg-sender self-sender">{{ msg.sender_id }}</div>
             <div class="msg-content self-msg">
-              <div class="msg-text">{{ parseMsg(msg.content).main }}</div>
+              <img v-if="msg.msg_type === 'image'" :src="parseMsg(msg.content).main" class="msg-image" alt="图片" @click="previewImage(parseMsg(msg.content).main)" />
+              <div v-else class="msg-text">{{ parseMsg(msg.content).main }}</div>
               <details v-if="parseMsg(msg.content).exec" class="exec-log">
                 <summary>📋 执行过程 ▾</summary>
                 <pre class="exec-steps">{{ parseMsg(msg.content).exec }}</pre>
@@ -42,7 +43,8 @@
               <span v-if="isBot(msg.sender_id)" class="bot-tag">🤖</span>
             </div>
             <div class="msg-content other-msg">
-              <div class="msg-text">{{ parseMsg(msg.content).main }}</div>
+              <img v-if="msg.msg_type === 'image'" :src="parseMsg(msg.content).main" class="msg-image" alt="图片" @click="previewImage(parseMsg(msg.content).main)" />
+              <div v-else class="msg-text">{{ parseMsg(msg.content).main }}</div>
               <details v-if="parseMsg(msg.content).exec" class="exec-log">
                 <summary>📋 执行过程 ▾</summary>
                 <pre class="exec-steps">{{ parseMsg(msg.content).exec }}</pre>
@@ -193,7 +195,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { useWebSocket } from '../composables/useWebSocket'
-import { getGroupMembers, getFriends, getMessages } from '../api'
+import { getGroupMembers, getFriends, getMessages, uploadImage } from '../api'
 
 const auth = useAuthStore()
 const chat = useChatStore()
@@ -531,7 +533,11 @@ function handleImgSelect(e: Event) {
   if (!file || !session.value) return
   const match = session.value.id.match(/^group:(\d+)$/)
   if (match) {
-    ws.sendMessage(parseInt(match[1]), `[图片] ${file.name}`)
+    const groupId = parseInt(match[1])
+    uploadImage(file, groupId).catch(err => {
+      console.error('Upload failed:', err)
+      alert('图片上传失败: ' + err.message)
+    })
   }
   input.value = ''
 }
@@ -545,6 +551,11 @@ function handleFileSelect(e: Event) {
     ws.sendMessage(parseInt(match[1]), `[文件] ${file.name}`)
   }
   input.value = ''
+}
+
+// 图片预览：在新窗口打开
+function previewImage(url: string) {
+  window.open(url, '_blank')
 }
 
 function inviteFriends() {
@@ -868,6 +879,13 @@ function onScroll() {
   line-height: 1.6;
   word-break: break-word;
   white-space: pre-wrap;
+}
+.msg-image {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: block;
 }
 .self-msg {
   background: #2d6cf0;

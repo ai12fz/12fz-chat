@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
 
 // ── Types matching backend API ──
 
@@ -40,6 +41,7 @@ export interface ChatSession {
   id: string           // "group:123" or "user:abc"
   name: string
   type: 'group' | 'user'
+  isDM?: boolean       // 私聊群组（2人群）
   unread: number
   lastMsg?: string
   lastMsgAt?: string
@@ -72,8 +74,9 @@ export const useChatStore = defineStore('chat', () => {
     if (!s) {
       s = {
         id,
-        name: group.name,
+        name: displayGroupName(group.name),
         type: 'group',
+        isDM: isDMGroupName(group.name),
         unread: 0,
         lastMsg: undefined,
         messages: [],
@@ -82,7 +85,24 @@ export const useChatStore = defineStore('chat', () => {
     }
     // Update metadata
     s.lastMsgAt = group.last_msg_at
+    s.name = displayGroupName(group.name)
+    s.isDM = isDMGroupName(group.name)
     return s
+  }
+
+  /** For DM groups (__dm__A__B__), show the other user's name */
+  function displayGroupName(rawName: string): string {
+    const dmMatch = rawName.match(/^__dm__(.+)__(.+)__$/)
+    if (dmMatch) {
+      const myName = useAuthStore().user?.username || ''
+      return dmMatch[1] === myName ? dmMatch[2] : dmMatch[1]
+    }
+    return rawName
+  }
+
+  /** Check if a group name is a DM (private chat) group */
+  function isDMGroupName(rawName: string): boolean {
+    return rawName.startsWith('__dm__')
   }
 
   function addSession(session: ChatSession) {
@@ -166,7 +186,7 @@ export const useChatStore = defineStore('chat', () => {
   return {
     sessions, activeId, activeSession, connected, doneSessions,
     pendingSessions, doneSessionList,
-    groupSessionId, ensureGroupSession,
+    groupSessionId, ensureGroupSession, displayGroupName, isDMGroupName,
     addSession, setActive, receiveMessage, loadMessages,
     setConnected, setMembers, markDone,
   }

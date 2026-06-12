@@ -100,3 +100,22 @@ export async function createDMGroup(friendId: string) {
   // data = { id, name, created_by, created_at }
   return data
 }
+
+// ── Image Upload ──
+
+export async function uploadImage(file: File, groupId: number) {
+  const formData = new FormData()
+  formData.append('image', file)
+  formData.append('group_id', String(groupId))
+  const token = localStorage.getItem('token')
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'upload failed' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}

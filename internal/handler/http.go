@@ -1,10 +1,19 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"image"
+	"image/jpeg"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -25,14 +34,16 @@ type HTTPHandler struct {
 	hub         *ws.Hub
 	authHandler *AuthHandler
 	startTime   time.Time
+	uploadDir   string
 }
 
-func NewHTTPHandler(database *db.DB, hub *ws.Hub, auth *AuthHandler) *HTTPHandler {
+func NewHTTPHandler(database *db.DB, hub *ws.Hub, auth *AuthHandler, uploadDir string) *HTTPHandler {
 	return &HTTPHandler{
 		db:          database,
 		hub:         hub,
 		authHandler: auth,
 		startTime:   time.Now(),
+		uploadDir:   uploadDir,
 	}
 }
 
@@ -324,6 +335,148 @@ func (h *HTTPHandler) CreateDMGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, group, 200)
+}
+
+// ── Upload ──
+
+// resizeImage scales image down so width ≤ maxWidth, maintaining aspect ratio.
+// Uses nearest-neighbor for speed. Re-encodes as JPEG quality 85.
+func resizeImage(img image.Image, maxWidth int) ([]byte, error) {
+	bounds := img.Bounds()
+	w := bounds.Dx()
+	h := bounds.Dy()
+
+	if w <= maxWidth {
+		// No resize needed, encode as-is
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
+
+	newW := maxWidth
+	newH := h * maxWidth / w
+	if newH < 1 {
+		newH = 1
+	}
+
+	dst := image.NewRGBA(image.Rect(0, 0, newW, newH))
+	for y := 0; y < newH; y++ {
+		for x := 0; x < newW; x++ {
+			srcX := float64(x) * float64(w) / float64(newW)
+			srcY := float64(y) * float64(h) / float64(newH)
+			xi := int(srcX)
+			yi := int(srcY)
+			if xi >= w {
+				xi = w - 1
+			}
+			if yi >= h {
+				yi = h - 1
+			}
+			dst.Set(x, y, img.At(xi, yi))
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// POST /api/upload - upload an image, resize if needed, save, create image message
+func (h *HTTPHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	// Limit upload size to 10MB (larger than 2MB to allow resizing)
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		jsonError(w, "file too large (max 10MB)", 400)
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		jsonError(w, "missing image field", 400)
+		return
+	}
+	defer file.Close()
+
+	// Validate MIME type
+	buf := make([]byte, 512)
+	file.Read(buf)
+	file.Seek(0, io.SeekStart)
+	mimeType := http.DetectContentType(buf)
+	if !strings.HasPrefix(mimeType, "image/") {
+		jsonError(w, "only image files allowed", 400)
+		return
+	}
+
+	// Decode image
+	img, _, err := image.Decode(file)
+	if err != nil {
+		jsonError(w, "invalid image file", 400)
+		return
+	}
+
+	// Resize if width > 1024 (auto-shrink to 1024)
+	imageData, err := resizeImage(img, 1024)
+	if err != nil {
+		log.Printf("[upload] resize: %v", err)
+		jsonError(w, "image processing failed", 500)
+		return
+	}
+	file.Close()
+
+	// Check resized size against 2MB limit
+	if len(imageData) > 2<<20 {
+		jsonError(w, "image too large even after resize (max 2MB)", 400)
+		return
+	}
+
+	// Generate unique filename (always .jpg after resize)
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%d%s", time.Now().UnixNano(), header.Filename)))
+	filename := hex.EncodeToString(hash[:16]) + ".jpg"
+
+	// Ensure upload dir exists
+	if err := os.MkdirAll(h.uploadDir, 0755); err != nil {
+		log.Printf("[upload] mkdir: %v", err)
+		jsonError(w, "server error", 500)
+		return
+	}
+
+	// Save resized image
+	if err := os.WriteFile(filepath.Join(h.uploadDir, filename), imageData, 0644); err != nil {
+		log.Printf("[upload] write: %v", err)
+		jsonError(w, "save failed", 500)
+		return
+	}
+
+	// Get group_id from form
+	groupIDStr := r.FormValue("group_id")
+	groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
+	if err != nil {
+		jsonError(w, "missing group_id", 400)
+		return
+	}
+
+	botID := getBotID(r)
+	imageURL := "/uploads/" + filename
+
+	// Create message with msg_type='image'
+	msg, err := h.db.CreateAndReturnMessageWithType(r.Context(), groupID, botID, imageURL, "image")
+	if err != nil {
+		log.Printf("[upload] save msg: %v", err)
+		jsonError(w, "save message failed", 500)
+		return
+	}
+
+	// Update group's last_msg_at
+	_ = h.db.UpdateGroupLastMsg(r.Context(), groupID)
+
+	// Broadcast via WebSocket
+	go h.broadcastMessage(msg)
+
+	jsonResp(w, msg, 201)
 }
 
 // ── Health ──

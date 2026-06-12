@@ -43,7 +43,7 @@ func main() {
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
-	httpHandler := handler.NewHTTPHandler(database, hub, authHandler)
+	httpHandler := handler.NewHTTPHandler(database, hub, authHandler, cfg.UploadDir)
 
 	// Setup router
 	r := mux.NewRouter()
@@ -69,6 +69,14 @@ func main() {
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 	api.HandleFunc("/groups/dm", httpHandler.CreateDMGroup).Methods("POST")
+	api.HandleFunc("/upload", httpHandler.UploadImage).Methods("POST")
+
+	// Serve uploaded files
+	r.PathPrefix("/uploads/").Handler(
+		http.StripPrefix("/uploads/",
+			http.FileServer(http.Dir(cfg.UploadDir)),
+		),
+	)
 
 	// WebSocket - token-based auth
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

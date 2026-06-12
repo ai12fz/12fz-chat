@@ -362,3 +362,18 @@ func (d *DB) CreateAndReturnMessage(ctx context.Context, groupID int64, senderID
 	).Scan(&m.ID, &m.CreatedAt)
 	return m, err
 }
+
+// CreateAndReturnMessageWithType inserts a message with custom msg_type (e.g. "image")
+func (d *DB) CreateAndReturnMessageWithType(ctx context.Context, groupID int64, senderID, content, msgType string) (*MessageResult, error) {
+	m := &MessageResult{
+		GroupID:  groupID,
+		SenderID: senderID,
+		Content:  content,
+		MsgType:  msgType,
+	}
+	err := d.pool.QueryRow(ctx,
+		`INSERT INTO chat.messages (group_id, sender_id, content, msg_type) VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
+		groupID, senderID, content, msgType,
+	).Scan(&m.ID, &m.CreatedAt)
+	return m, err
+}

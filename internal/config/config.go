@@ -13,6 +13,7 @@ type Config struct {
 	AdminBotID string
 	AdminPass  string
 	BotTokens  map[string]string // bot_id -> token
+	UploadDir  string            // 图片上传保存目录
 }
 
 // PGConnString method to satisfy db.Connect interface
@@ -34,6 +35,7 @@ func Load() *Config {
 		JWTSecret:  getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
 		AdminBotID: getEnv("ADMIN_BOT_ID", "admin"),
 		AdminPass:  getEnv("ADMIN_PASS", "admin123"),
+		UploadDir:  getEnv("UPLOAD_DIR", "/var/www/chat.12fz.com/uploads"),
 		BotTokens:  bt,
 	}
 }

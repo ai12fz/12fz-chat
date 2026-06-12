@@ -46,9 +46,9 @@
               <div class="session-top">
                 <span class="session-name text-overflow">{{ s.name }}</span>
                 <span v-if="s.type === 'user' && isBot(s.name)" class="bot-tag">🤖</span>
-                <span class="session-type-tag">{{ s.type === 'group' ? '群' : '友' }}</span>
+                <span class="session-type-tag">{{ s.isDM ? '友' : s.type === 'group' ? '群' : '友' }}</span>
               </div>
-              <span class="session-last-msg text-overflow">{{ s.lastMsg || '暂无消息' }}</span>
+              <span v-if="s.lastMsg" class="session-last-msg text-overflow">{{ s.lastMsg }}</span>
             </div>
             <div class="session-right">
               <span v-if="s.unread > 0" class="unread-badge">{{ s.unread > 99 ? '99+' : s.unread }}</span>
@@ -67,9 +67,9 @@
               <div class="session-top">
                 <span class="session-name text-overflow">{{ s.name }}</span>
                 <span v-if="s.type === 'user' && isBot(s.name)" class="bot-tag">🤖</span>
-                <span class="session-type-tag">{{ s.type === 'group' ? '群' : '友' }}</span>
+                <span class="session-type-tag">{{ s.isDM ? '友' : s.type === 'group' ? '群' : '友' }}</span>
               </div>
-              <span class="session-last-msg text-overflow">{{ s.lastMsg || '暂无消息' }}</span>
+              <span v-if="s.lastMsg" class="session-last-msg text-overflow">{{ s.lastMsg }}</span>
             </div>
             <div class="session-right">
               <span v-if="s.lastMsgAt" class="session-time">{{ formatAgo(s.lastMsgAt) }}</span>
@@ -203,6 +203,7 @@ async function openFriendChat(f: { id: string; name: string }) {
         id,
         name: f.name,          // show friend's name, not DM group name
         type: 'group' as const,  // messages are grouped
+        isDM: true,
         unread: 0,
         messages: [],
       }
