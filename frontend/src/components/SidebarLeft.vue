@@ -206,6 +206,9 @@ function openFriendChat(f: { id: string; name: string }) {
     chat.addSession(s)
   }
   chat.setActive(id)
+  // 自动跳转到消息Tab待处理状态
+  activeTab.value = 'msg'
+  subTab.value = 'pending'
 }
 
 const activeTab = ref<'msg' | 'contact'>('msg')
