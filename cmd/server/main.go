@@ -68,6 +68,7 @@ func main() {
 	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
+	api.HandleFunc("/groups/dm", httpHandler.CreateDMGroup).Methods("POST")
 
 	// WebSocket - token-based auth
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

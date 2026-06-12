@@ -307,6 +307,25 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, friends, 200)
 }
 
+// ── DM (Direct Message) Group ──
+
+func (h *HTTPHandler) CreateDMGroup(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		FriendID string `json:"friend_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "bad request", 400)
+		return
+	}
+	botID := getBotID(r)
+	group, err := h.db.FindOrCreateDMGroup(r.Context(), botID, req.FriendID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, group, 200)
+}
+
 // ── Health ──
 
 func (h *HTTPHandler) Health(w http.ResponseWriter, r *http.Request) {

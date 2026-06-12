@@ -146,7 +146,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
-import { getFriends, addFriend } from '../api'
+import { getFriends, addFriend, createDMGroup } from '../api'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -191,24 +191,31 @@ async function handleAddFriend() {
 
 onMounted(loadFriends)
 
-function openFriendChat(f: { id: string; name: string }) {
-  const id = `user:${f.id}`
-  // Find existing session or create one
-  let s = chat.sessions.find(s => s.id === id)
-  if (!s) {
-    s = {
-      id,
-      name: f.name,
-      type: 'user',
-      unread: 0,
-      messages: [],
+async function openFriendChat(f: { id: string; name: string }) {
+  // Create or find a DM group via API
+  try {
+    const group = await createDMGroup(f.id)
+    const id = `group:${group.id}`
+    // Find existing session or create one
+    let s = chat.sessions.find(s => s.id === id)
+    if (!s) {
+      s = {
+        id,
+        name: f.name,          // show friend's name, not DM group name
+        type: 'group' as const,  // messages are grouped
+        unread: 0,
+        messages: [],
+      }
+      chat.addSession(s)
     }
-    chat.addSession(s)
+    chat.setActive(id)
+    // 自动跳转到消息Tab待处理状态
+    activeTab.value = 'msg'
+    subTab.value = 'pending'
+  } catch (e: any) {
+    console.error('Failed to open DM chat', e)
+    alert(e?.response?.data?.error || '打开聊天失败')
   }
-  chat.setActive(id)
-  // 自动跳转到消息Tab待处理状态
-  activeTab.value = 'msg'
-  subTab.value = 'pending'
 }
 
 const activeTab = ref<'msg' | 'contact'>('msg')

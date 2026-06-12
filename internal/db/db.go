@@ -280,6 +280,47 @@ func (d *DB) GetUnreadCountForUser(ctx context.Context, botID string) (map[int64
 	return result, nil
 }
 
+// ── DM (Direct Message) Group ──
+
+// FindOrCreateDMGroup finds or creates a 2-person DM group.
+// DM group name: "__dm__userA__userB__" where userA < userB (sorted).
+func (d *DB) FindOrCreateDMGroup(ctx context.Context, userID, friendID string) (*model.Group, error) {
+	userA, userB := userID, friendID
+	if userA > userB {
+		userA, userB = userB, userA
+	}
+	dmName := fmt.Sprintf("__dm__%s__%s__", userA, userB)
+
+	// Try to find existing DM group
+	var g model.Group
+	err := d.pool.QueryRow(ctx,
+		"SELECT id, name, created_by, created_at FROM chat.groups WHERE name = $1",
+		dmName).Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt)
+	if err == nil {
+		return &g, nil
+	}
+
+	// Create new DM group
+	g = model.Group{Name: dmName, CreatedBy: userID}
+	err = d.pool.QueryRow(ctx,
+		"INSERT INTO chat.groups (name, created_by) VALUES ($1, $2) RETURNING id, created_at",
+		dmName, userID,
+	).Scan(&g.ID, &g.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add both users as members
+	if err := d.AddMember(ctx, g.ID, userID, "admin"); err != nil {
+		return nil, err
+	}
+	if err := d.AddMember(ctx, g.ID, friendID, "member"); err != nil {
+		return nil, err
+	}
+
+	return &g, nil
+}
+
 // ── Friend ──
 
 func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {

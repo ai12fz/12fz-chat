@@ -92,3 +92,11 @@ export async function addFriend(userId: string, friendId: string) {
   const { data } = await api.post('/friends', { user_id: userId, friend_id: friendId })
   return data
 }
+
+// ── DM (Direct Message) Group ──
+
+export async function createDMGroup(friendId: string) {
+  const { data } = await api.post('/groups/dm', { friend_id: friendId })
+  // data = { id, name, created_by, created_at }
+  return data
+}
