@@ -115,7 +115,7 @@ func (d *DB) SaveMessage(ctx context.Context, m *model.Message) error {
 }
 
 func (d *DB) GetMessages(ctx context.Context, groupID int64, limit, offset int) ([]model.Message, error) {
-	if limit <= 0 || limit > 100 {
+	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 	rows, err := d.pool.Query(ctx,

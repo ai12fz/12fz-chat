@@ -1,14 +1,24 @@
-import { ref, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useChatStore } from '../stores/chat'
+import { markRead } from '../api'
 import type { BackendMessage } from '../stores/chat'
 
+// ── Singleton: one WebSocket instance shared by all components ──
+let ws: WebSocket | null = null
+let reconnectTimer = 0
+let currentToken = ''
+let connectedRef = ref(false)
+
 export function useWebSocket() {
-  let ws: WebSocket | null = null
   const store = useChatStore()
-  const reconnectTimer = ref<number>()
 
   function connect(token: string) {
-    if (ws) disconnect()
+    currentToken = token
+    if (ws) {
+      // Already connected or connecting — skip
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) return
+      disconnect()
+    }
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const url = `${protocol}//${location.host}/ws?token=${token}`
@@ -18,16 +28,13 @@ export function useWebSocket() {
     ws.onopen = () => {
       console.log('[ws] connected')
       store.setConnected(true)
-      clearTimeout(reconnectTimer.value)
+      connectedRef.value = true
+      clearTimeout(reconnectTimer)
     }
 
     ws.onmessage = (e) => {
       try {
         const pkt = JSON.parse(e.data)
-        // Backend protocol:
-        //   {type:"hello", data:{bot_id, msg}}
-        //   {type:"message", data:{id,group_id,sender_id,content,msg_type,send_at}}
-        //   {type:"event", data:{event, bot_id}}
         switch (pkt.type) {
           case 'hello':
             console.log('[ws] hello:', pkt.data)
@@ -47,7 +54,9 @@ export function useWebSocket() {
     ws.onclose = () => {
       console.log('[ws] disconnected, reconnecting in 3s...')
       store.setConnected(false)
-      reconnectTimer.value = window.setTimeout(() => connect(token), 3000)
+      connectedRef.value = false
+      ws = null
+      reconnectTimer = window.setTimeout(() => connect(currentToken), 3000)
     }
 
     ws.onerror = () => {
@@ -56,8 +65,18 @@ export function useWebSocket() {
     }
   }
 
-  function handleMessage(data: BackendMessage) {
-    store.receiveMessage(data)
+  function handleMessage(data: BackendMessage & { send_at?: string }) {
+    // Normalize: WS sends send_at, REST returns created_at
+    if (data.send_at && !data.created_at) {
+      (data as any).created_at = data.send_at
+    }
+    const store = useChatStore()
+    store.receiveMessage(data as BackendMessage)
+    // Real-time markRead: if the current active session is this group
+    const activeId = store.activeId
+    if (activeId && activeId === `group:${data.group_id}`) {
+      markRead(data.group_id, data.id).catch(() => {/* non-critical */})
+    }
   }
 
   function handleEvent(data: { event: string; bot_id: string }) {
@@ -66,12 +85,13 @@ export function useWebSocket() {
     }
   }
 
-  /** Send a text message via WebSocket */
   function sendMessage(groupId: number, content: string) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.warn('[ws] cannot send: not connected')
+      return
+    }
     ws.send(JSON.stringify({
       type: 'message',
-      // Backend expects { group_id, content } in data
       data: {
         group_id: groupId,
         content,
@@ -82,10 +102,8 @@ export function useWebSocket() {
   function disconnect() {
     ws?.close()
     ws = null
-    clearTimeout(reconnectTimer.value)
+    clearTimeout(reconnectTimer)
   }
 
-  onUnmounted(disconnect)
-
-  return { connect, sendMessage, disconnect }
+  return { connect, sendMessage, disconnect, connected: connectedRef }
 }

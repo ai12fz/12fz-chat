@@ -67,15 +67,15 @@ async function handleLogin() {
   text-align: center;
   margin-bottom: 32px;
 }
-.login-header h1 { font-size: 24px; margin: 0 0 8px; }
-.login-header p { color: #888; margin: 0; }
+.login-header h1 { font-size: 28px; margin: 0 0 8px; }
+.login-header p { color: #888; margin: 0; font-size: 16px; }
 .field { margin-bottom: 16px; }
 .field input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 16px;
   box-sizing: border-box;
 }
 .field input:focus {
@@ -83,15 +83,15 @@ async function handleLogin() {
   outline: none;
   box-shadow: 0 0 0 2px rgba(24,144,255,.2);
 }
-.error { color: #f5222d; font-size: 13px; margin-bottom: 12px; }
+.error { color: #f5222d; font-size: 15px; margin-bottom: 12px; }
 button {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   background: #1890ff;
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-size: 15px;
+  font-size: 17px;
   cursor: pointer;
 }
 button:disabled { opacity: .6; cursor: not-allowed; }

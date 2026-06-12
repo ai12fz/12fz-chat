@@ -33,6 +33,7 @@ export interface BackendMessage {
   content: string
   msg_type: string
   created_at: string
+  send_at?: string     // WS broadcasts use this (Go ChatMessage)
 }
 
 export interface ChatSession {
@@ -52,6 +53,8 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([])
   const activeId = ref<string>('')
   const connected = ref(false)
+  // 已处理标记：session_id → true
+  const doneSessions = ref<Record<string, boolean>>({})
 
   const activeSession = computed(() =>
     sessions.value.find(s => s.id === activeId.value)
@@ -115,7 +118,11 @@ export const useChatStore = defineStore('chat', () => {
     })
     s.lastMsg = msg.content
     s.lastMsgAt = msg.created_at
-    if (sessionId !== activeId.value) s.unread++
+    if (sessionId !== activeId.value) {
+      s.unread++
+      // 有新消息 → 自动移出已处理
+      delete doneSessions.value[sessionId]
+    }
   }
 
   /** Load historical messages into a session */
@@ -137,10 +144,30 @@ export const useChatStore = defineStore('chat', () => {
     if (s) s.members = members
   }
 
+  // 待处理会话：有未读消息
+  const pendingSessions = computed(() =>
+    sessions.value.filter(s => s.unread > 0)
+  )
+
+  // 已处理会话：手动标记、无新消息
+  const doneSessionList = computed(() =>
+    sessions.value.filter(s => s.unread === 0 && doneSessions.value[s.id])
+  )
+
+  // 标记已处理
+  function markDone(id: string) {
+    const s = sessions.value.find(s => s.id === id)
+    if (s) {
+      s.unread = 0
+      doneSessions.value[id] = true
+    }
+  }
+
   return {
-    sessions, activeId, activeSession, connected,
+    sessions, activeId, activeSession, connected, doneSessions,
+    pendingSessions, doneSessionList,
     groupSessionId, ensureGroupSession,
     addSession, setActive, receiveMessage, loadMessages,
-    setConnected, setMembers,
+    setConnected, setMembers, markDone,
   }
 })
