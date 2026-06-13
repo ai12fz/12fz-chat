@@ -57,9 +57,9 @@
             </div>
           </div>
           <div class="data-form-item">
-            <div class="form-input-item form-input-item-white" style="display:flex;align-items:center;gap:4px;padding:0 6px">
-              <input v-model="captchaAnswer" placeholder="验证码" style="flex:1;height:30px;border:none;outline:none;font-size:14px;background:transparent;min-width:0" />
-              <div v-html="captchaSVG" @click="loadCaptcha" style="cursor:pointer;flex-shrink:0;border-left:1px solid #eee;padding-left:6px;line-height:0;transform:scale(0.5) translateY(-6px);transform-origin:left center;width:80px;height:30px;overflow:hidden" title="点击刷新"></div>
+            <div class="form-input-item form-input-item-white captcha-row">
+              <input v-model="captchaAnswer" placeholder="验证码" class="captcha-input" />
+              <div v-html="captchaSVG" @click="loadCaptcha" class="captcha-svg" title="点击刷新"></div>
             </div>
           </div>
           <div v-if="error" class="error">{{ error }}</div>
@@ -320,6 +320,41 @@ onMounted(() => {
 .login-btn.disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.captcha-row {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  position: relative;
+  gap: 4px;
+}
+.captcha-input {
+  flex: 1;
+  min-width: 80px;
+  height: 30px;
+  line-height: 30px;
+  padding: 0 6px;
+  margin-top: 3px;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  position: relative;
+  z-index: 2;
+}
+.captcha-svg {
+  flex-shrink: 0;
+  cursor: pointer;
+  border-left: 1px solid #eee;
+  padding-left: 10px;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  transform: scale(0.5);
+  transform-origin: left center;
+  position: relative;
+  z-index: 1;
 }
 
 .error {
