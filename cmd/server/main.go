@@ -39,7 +39,7 @@ func main() {
 	hub := ws.NewHub()
 
 	// Init auth handler
-	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass, cfg.BotTokens)
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass, cfg.SSOSecret, cfg.BotTokens)
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
@@ -50,9 +50,18 @@ func main() {
 
 	// Health check (public)
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
+	r.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("chat-server v3 (png-debug)"))
+	}).Methods("GET")
 
 	// Login (public)
 	r.HandleFunc("/api/login", authHandler.Login).Methods("POST")
+
+	// SSO Login (public, for cross-system auth)
+	r.HandleFunc("/api/sso/login", authHandler.SSOLogin).Methods("POST")
+
+	// Captcha (public, for login page)
+	r.HandleFunc("/api/captcha", httpHandler.GetCaptcha).Methods("GET")
 
 	// REST API (authenticated)
 	api := r.PathPrefix("/api").Subrouter()
@@ -70,6 +79,7 @@ func main() {
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 	api.HandleFunc("/groups/dm", httpHandler.CreateDMGroup).Methods("POST")
 	api.HandleFunc("/upload", httpHandler.UploadImage).Methods("POST")
+	api.HandleFunc("/avatar", httpHandler.UploadAvatar).Methods("POST")
 
 	// Serve uploaded files
 	r.PathPrefix("/uploads/").Handler(

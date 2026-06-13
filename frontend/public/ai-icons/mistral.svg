@@ -1,0 +1,43 @@
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#FFAF01"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFA500"/>
+      <stop offset="100%" stop-color="#FF8204"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF6B35"/>
+      <stop offset="100%" stop-color="#FA500F"/>
+    </linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF2020"/>
+      <stop offset="100%" stop-color="#E10500"/>
+    </linearGradient>
+    <linearGradient id="g5" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4001A"/>
+      <stop offset="100%" stop-color="#B00018"/>
+    </linearGradient>
+  </defs>
+  <!-- Row 1 -->
+  <rect x="60" y="50" width="55" height="55" rx="4" fill="url(#g1)" filter="url(#shadow)"/>
+  <rect x="285" y="50" width="55" height="55" rx="4" fill="url(#g1)" filter="url(#shadow)"/>
+  <!-- Row 2 -->
+  <rect x="60" y="115" width="130" height="55" rx="4" fill="url(#g2)" filter="url(#shadow)"/>
+  <rect x="210" y="115" width="130" height="55" rx="4" fill="url(#g2)" filter="url(#shadow)"/>
+  <!-- Row 3 -->
+  <rect x="60" y="180" width="280" height="55" rx="4" fill="url(#g3)" filter="url(#shadow)"/>
+  <!-- Row 4 -->
+  <rect x="60" y="245" width="55" height="55" rx="4" fill="url(#g4)" filter="url(#shadow)"/>
+  <rect x="130" y="245" width="55" height="55" rx="4" fill="url(#g4)" filter="url(#shadow)"/>
+  <rect x="210" y="245" width="55" height="55" rx="4" fill="url(#g4)" filter="url(#shadow)"/>
+  <rect x="285" y="245" width="55" height="55" rx="4" fill="url(#g4)" filter="url(#shadow)"/>
+  <!-- Row 5 -->
+  <rect x="10" y="310" width="145" height="55" rx="4" fill="url(#g5)" filter="url(#shadow)"/>
+  <rect x="245" y="310" width="145" height="55" rx="4" fill="url(#g5)" filter="url(#shadow)"/>
+</svg>

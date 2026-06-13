@@ -12,8 +12,8 @@ export const useAuthStore = defineStore('auth', () => {
     bot_id: botId.value,
   }))
 
-  async function login(username: string, password: string) {
-    const res = await apiLogin(username, password)
+  async function login(username: string, password: string, captchaId?: string, captchaAnswer?: number) {
+    const res = await apiLogin(username, password, captchaId, captchaAnswer)
     // Backend response: { token, bot_id, expire }
     token.value = res.token
     botId.value = res.bot_id

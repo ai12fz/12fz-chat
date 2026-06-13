@@ -324,8 +324,11 @@ func (d *DB) FindOrCreateDMGroup(ctx context.Context, userID, friendID string) (
 // ── Friend ──
 
 func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {
+	// 双向好友关系：A→B + B→A，状态 direct 'accepted'（企业内部不需要审批）
 	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.friends (user_id, friend_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING",
+		`INSERT INTO chat.friends (user_id, friend_id, status)
+		 VALUES ($1, $2, 'accepted'), ($2, $1, 'accepted')
+		 ON CONFLICT DO NOTHING`,
 		userID, friendID)
 	return err
 }

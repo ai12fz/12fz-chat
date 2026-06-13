@@ -27,8 +27,11 @@ export default api
 
 // ── Auth ──
 
-export async function login(username: string, password: string) {
-  const { data } = await api.post('/login', { username, password })
+export async function login(username: string, password: string, captchaId?: string, captchaAnswer?: number) {
+  const body: any = { username, password }
+  if (captchaId) body.captcha_id = captchaId
+  if (captchaAnswer !== undefined) body.captcha_answer = captchaAnswer
+  const { data } = await api.post('/login', body)
   return data // { token, bot_id, expire }
 }
 
@@ -109,6 +112,22 @@ export async function uploadImage(file: File, groupId: number) {
   formData.append('group_id', String(groupId))
   const token = localStorage.getItem('token')
   const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'upload failed' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function uploadAvatar(file: File) {
+  const formData = new FormData()
+  formData.append('avatar', file)
+  const token = localStorage.getItem('token')
+  const res = await fetch('/api/avatar', {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,

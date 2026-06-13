@@ -14,6 +14,7 @@ type Config struct {
 	AdminPass  string
 	BotTokens  map[string]string // bot_id -> token
 	UploadDir  string            // 图片上传保存目录
+	SSOSecret  string            // SSO共享密钥（多系统打通）
 }
 
 // PGConnString method to satisfy db.Connect interface
@@ -36,6 +37,7 @@ func Load() *Config {
 		AdminBotID: getEnv("ADMIN_BOT_ID", "admin"),
 		AdminPass:  getEnv("ADMIN_PASS", "admin123"),
 		UploadDir:  getEnv("UPLOAD_DIR", "/var/www/chat.12fz.com/uploads"),
+		SSOSecret:  getEnv("SSO_SECRET", "12fz-sso-2026"),
 		BotTokens:  bt,
 	}
 }

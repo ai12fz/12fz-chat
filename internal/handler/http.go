@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"net/http"
@@ -414,7 +415,9 @@ func (h *HTTPHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	// Decode image
 	img, _, err := image.Decode(file)
 	if err != nil {
-		jsonError(w, "invalid image file", 400)
+		errStr := fmt.Sprintf("decode_err=%v|mime=%s", err, mimeType)
+		log.Printf("[upload] %s", errStr)
+		jsonResp(w, map[string]string{"error": "invalid image file", "debug": errStr}, 400)
 		return
 	}
 
@@ -477,6 +480,71 @@ func (h *HTTPHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	go h.broadcastMessage(msg)
 
 	jsonResp(w, msg, 201)
+}
+
+// ── Avatar Upload ──
+
+func (h *HTTPHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // 5MB limit
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		jsonError(w, "file too large (max 5MB)", 400)
+		return
+	}
+
+	file, _, err := r.FormFile("avatar")
+	if err != nil {
+		jsonError(w, "missing avatar field", 400)
+		return
+	}
+	defer file.Close()
+
+	// Validate MIME type
+	buf := make([]byte, 512)
+	file.Read(buf)
+	file.Seek(0, io.SeekStart)
+	mimeType := http.DetectContentType(buf)
+	if !strings.HasPrefix(mimeType, "image/") {
+		jsonError(w, "only image files allowed", 400)
+		return
+	}
+
+	// Decode image
+	img, _, err := image.Decode(file)
+	if err != nil {
+		jsonError(w, "invalid image file", 400)
+		return
+	}
+
+	// Resize avatar to max 200px
+	avatarData, err := resizeImage(img, 200)
+	if err != nil {
+		jsonError(w, "image processing failed", 500)
+		return
+	}
+
+	botID := getBotID(r)
+	if botID == "" {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+
+	// Ensure upload dir exists
+	if err := os.MkdirAll(h.uploadDir, 0755); err != nil {
+		log.Printf("[avatar] mkdir: %v", err)
+		jsonError(w, "server error", 500)
+		return
+	}
+
+	// Save avatar: avatar_{botID}.jpg (overwrites on re-upload)
+	filename := "avatar_" + botID + ".jpg"
+	if err := os.WriteFile(filepath.Join(h.uploadDir, filename), avatarData, 0644); err != nil {
+		log.Printf("[avatar] write: %v", err)
+		jsonError(w, "save failed", 500)
+		return
+	}
+
+	avatarURL := "/uploads/" + filename
+	jsonResp(w, map[string]string{"avatar_url": avatarURL}, 200)
 }
 
 // ── Health ──

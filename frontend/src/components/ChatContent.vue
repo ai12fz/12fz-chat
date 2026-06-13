@@ -716,26 +716,20 @@ const unreadDividerIndex = computed(() => {
   return idx >= 0 && idx < s.messages.length ? idx : -1
 })
 
-// 标记：切换会话后等待消息加载完再滚到底
-let pendingScrollToBottom = false
+// ── 消息滚动 ──
 
-// 消息列表变化：切会话强制滚到底，新消息只在底部才滚
+// 消息列表变化：新消息只在底部才滚（切换会话的滚底由 activeId watch 的 waitAndScroll 负责）
 watch(() => session.value?.messages.length, async () => {
   await nextTick()
   if (!msgListRef.value) return
-  if (pendingScrollToBottom) {
-    msgListRef.value.scrollTop = msgListRef.value.scrollHeight
-    pendingScrollToBottom = false
-  } else {
-    const el = msgListRef.value
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
-    if (nearBottom) {
-      el.scrollTop = el.scrollHeight
-    }
+  const el = msgListRef.value
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+  if (nearBottom) {
+    el.scrollTop = el.scrollHeight
   }
 })
 
-// 切换会话：重置状态 + 滚到底（flush:'post'确保DOM已更新）
+// 切换会话：重置状态
 watch(() => chat.activeId, async () => {
   await nextTick()
   loadedCount.value = 0
@@ -745,12 +739,24 @@ watch(() => chat.activeId, async () => {
   cachedFriends.value = []
   showMention.value = false
   showShortcut.value = false
-  // 滚到底
-  if (msgListRef.value) {
-    msgListRef.value.scrollTop = msgListRef.value.scrollHeight
+
+  // 等 ChatView 加载完消息后，确保滚到底
+  // 因为 ChatView 的 watch 是异步的，需要等它加载完
+  const waitAndScroll = async (retries = 20) => {
+    if (!session.value || session.value.messages.length === 0) {
+      if (retries > 0) {
+        await new Promise(r => setTimeout(r, 100))
+        return waitAndScroll(retries - 1)
+      }
+      return
+    }
+    await nextTick()
+    if (msgListRef.value) {
+      msgListRef.value.scrollTop = msgListRef.value.scrollHeight
+    }
   }
-  pendingScrollToBottom = true
-}, { flush: 'post' })
+  waitAndScroll()
+})
 
 // ── 滚动加载更多历史消息 ──
 const loadedCount = ref(0)   // 当前已加载的消息数（作为offset）
@@ -819,7 +825,7 @@ function onScroll() {
   padding: 8px 16px;
   border-bottom: 1px solid rgba(0,0,0,.06);
   position: relative;
-  background: #f8f9fa;
+  background: transparent;
 }
 .sz_othersTitle h3 {
   font-size: 17px;

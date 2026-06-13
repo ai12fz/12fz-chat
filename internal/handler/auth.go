@@ -17,21 +17,25 @@ type AuthHandler struct {
 	jwtSecret string
 	adminID   string
 	adminPass string
+	ssoSecret string
 	botTokens map[string]string // bot_id -> pre-shared token
 }
 
-func NewAuthHandler(jwtSecret, adminID, adminPass string, botTokens map[string]string) *AuthHandler {
+func NewAuthHandler(jwtSecret, adminID, adminPass, ssoSecret string, botTokens map[string]string) *AuthHandler {
 	return &AuthHandler{
 		jwtSecret: jwtSecret,
 		adminID:   adminID,
 		adminPass: adminPass,
+		ssoSecret: ssoSecret,
 		botTokens: botTokens,
 	}
 }
 
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+	CaptchaID     string `json:"captcha_id"`
+	CaptchaAnswer int    `json:"captcha_answer"`
 }
 
 type LoginResponse struct {
@@ -45,6 +49,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "bad request", 400)
 		return
+	}
+
+	// Verify captcha
+	if req.CaptchaID != "" {
+		if !getCaptchaStore().Verify(req.CaptchaID, req.CaptchaAnswer) {
+			jsonError(w, "验证码错误", 400)
+			return
+		}
 	}
 
 	if req.Username != h.adminID || req.Password != h.adminPass {
@@ -118,7 +130,74 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 	return payload.BotID, nil
 }
 
-// ExtractTokenFromHeader extracts Bearer token from Authorization header
+// ── SSO Login ──
+
+type SSOLoginRequest struct {
+	Source       string `json:"source"`        // e.g. "erp", "wp", "future_system"
+	UserID       string `json:"user_id"`       // e.g. "suzao", "admin"
+	DisplayName  string `json:"display_name"`  // e.g. "数造科技", "管理员"
+	SSOSecret    string `json:"sso_secret"`    // shared secret key
+}
+
+type SSOLoginResponse struct {
+	Token      string `json:"token"`
+	BotID      string `json:"bot_id"`
+	Source     string `json:"source"`
+	SourceName string `json:"source_name"`
+	Expire     int64  `json:"expire"`
+}
+
+func (h *AuthHandler) SSOLogin(w http.ResponseWriter, r *http.Request) {
+	var req SSOLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "bad request", 400)
+		return
+	}
+
+	// Validate required fields
+	if req.Source == "" || req.UserID == "" || req.SSOSecret == "" {
+		jsonError(w, "missing required fields (source, user_id, sso_secret)", 400)
+		return
+	}
+
+	// Validate SSO secret
+	if req.SSOSecret != h.ssoSecret {
+		jsonError(w, "invalid sso_secret", 401)
+		return
+	}
+
+	// Build bot_id: just the user_id (same user from different systems = same chat user)
+	botID := req.UserID
+
+	// Generate short-lived token (2 hours)
+	expire := time.Now().Add(2 * time.Hour).Unix()
+	token, err := h.generateSSOToken(botID, req.Source, req.DisplayName, expire)
+	if err != nil {
+		jsonError(w, "token error", 500)
+		return
+	}
+
+	jsonResp(w, SSOLoginResponse{
+		Token:      token,
+		BotID:      botID,
+		Source:     req.Source,
+		SourceName: req.DisplayName,
+		Expire:     expire,
+	}, 200)
+}
+
+func (h *AuthHandler) generateSSOToken(botID, source, name string, expire int64) (string, error) {
+	header := base64URLEncode([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	payloadData, _ := json.Marshal(map[string]interface{}{
+		"bot_id": botID,
+		"source": source,
+		"name":   name,
+		"exp":    expire,
+	})
+	payload := base64URLEncode(payloadData)
+	sig := hmacSHA256(header+"."+payload, h.jwtSecret)
+	return header + "." + payload + "." + sig, nil
+}
 func ExtractTokenFromHeader(r *http.Request) string {
 	auth := r.Header.Get("Authorization")
 	if strings.HasPrefix(auth, "Bearer ") {
