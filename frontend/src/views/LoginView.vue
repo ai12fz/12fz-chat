@@ -8,7 +8,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="14" rx="3"/><circle cx="8" cy="10" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/><path d="M6 17v3h12v-3"/><line x1="9" y1="3" x2="9" y2="1"/><line x1="15" y1="3" x2="15" y2="1"/></svg>
         <span class="icon-label">AI Chat</span>
       </div>
-      <div class="ai-icon" style="top:18%;right:7%;animation-delay:0.5s;width:60px;height:60px;color:#00e5a0">
+      <div class="ai-icon" style="top:18%;right:calc(7% + 50px);animation-delay:0.5s;width:60px;height:60px;color:#00e5a0">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 10h6"/><path d="M9 14h6"/><circle cx="8" cy="10" r="1" fill="currentColor"/></svg>
         <span class="icon-label">智能</span>
       </div>
@@ -16,7 +16,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21c0-4.418-3.582-8-8-8s-8 3.582-8 8"/><path d="M5 5L3 7"/><path d="M19 5l2 2"/><path d="M12 2V0"/></svg>
         <span class="icon-label">协作</span>
       </div>
-      <div class="ai-icon" style="bottom:25%;right:3%;animation-delay:0.3s;width:54px;height:54px;color:#1e90ff">
+      <div class="ai-icon" style="bottom:25%;right:calc(3% + 50px);animation-delay:0.3s;width:54px;height:54px;color:#1e90ff">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         <span class="icon-label">极速</span>
       </div>
@@ -24,7 +24,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a3 3 0 0 0-3 3v1H8a3 3 0 0 0-3 3v1H4a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3h1v1a3 3 0 0 0 3 3h1v1a3 3 0 0 0 3 3h2a3 3 0 0 0 3-3v-1h1a3 3 0 0 0 3-3v-1h1a3 3 0 0 0 3-3v-2a3 3 0 0 0-3-3h-1v-1a3 3 0 0 0-3-3h-1V5a3 3 0 0 0-3-3h-2z"/><circle cx="12" cy="12" r="3" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
         <span class="icon-label">AI</span>
       </div>
-      <div class="ai-icon" style="top:50%;right:0%;animation-delay:1.2s;width:57px;height:57px;color:#a855f7">
+      <div class="ai-icon" style="top:50%;right:calc(0% + 50px);animation-delay:1.2s;width:57px;height:57px;color:#a855f7">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="16" rx="3"/><circle cx="8" cy="11" r="1.5" fill="currentColor"/><circle cx="16" cy="11" r="1.5" fill="currentColor"/><path d="M8 16c2 1.5 6 1.5 8 0"/><line x1="12" y1="3" x2="12" y2="5"/></svg>
         <span class="icon-label">数据</span>
       </div>
