@@ -59,7 +59,7 @@
           <div class="data-form-item">
             <div class="form-input-item form-input-item-white" style="display:flex;align-items:center;gap:4px;padding:0 6px">
               <input v-model="captchaAnswer" placeholder="验证码" style="flex:1;height:30px;border:none;outline:none;font-size:14px;background:transparent;min-width:0" />
-              <div v-html="captchaSVG" @click="loadCaptcha" style="cursor:pointer;flex-shrink:0;border-left:1px solid #eee;padding-left:6px;line-height:0;transform:scale(0.5);transform-origin:left center;width:80px;height:30px;overflow:hidden" title="点击刷新"></div>
+              <div v-html="captchaSVG" @click="loadCaptcha" style="cursor:pointer;flex-shrink:0;border-left:1px solid #eee;padding-left:6px;line-height:0;transform:scale(0.5) translateY(-6px);transform-origin:left center;width:80px;height:30px;overflow:hidden" title="点击刷新"></div>
             </div>
           </div>
           <div v-if="error" class="error">{{ error }}</div>
