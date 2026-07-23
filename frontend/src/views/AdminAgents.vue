@@ -62,6 +62,14 @@
           <textarea v-model="form.system_prompt" rows="4" placeholder="定义 Agent 的角色和行为..." />
         </div>
         <div class="form-group">
+          <label>API Key</label>
+          <input v-model="form.api_key" type="password" placeholder="API 密钥" />
+        </div>
+        <div class="form-group">
+          <label>API URL</label>
+          <input v-model="form.api_url" placeholder="如 https://tk.12fz.com/v1" />
+        </div>
+        <div class="form-group">
           <label>能力</label>
           <div class="checkbox-group">
             <label v-for="c in allCaps" :key="c"><input type="checkbox" :value="c" v-model="form.capabilities" /> {{ c }}</label>
@@ -115,6 +123,8 @@ interface Agent {
   system_prompt: string
   capabilities: string[]
   status: string
+  api_key: string
+  api_url: string
   group_count?: number
 }
 
