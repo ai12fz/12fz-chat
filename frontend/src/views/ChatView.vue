@@ -41,10 +41,6 @@ onMounted(async () => {
       if (!firstId) firstId = chat.groupSessionId(g.id)
     })
 
-    // Load unread counts
-    try {
-  
-
     // Load messages for all groups immediately
     for (const g of groups) {
       try {
