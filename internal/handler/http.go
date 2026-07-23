@@ -412,3 +412,102 @@ func (h *HTTPHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
 }
+// ── Agent CRUD ──
+
+func (h *HTTPHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
+	agents, err := h.db.ListAgents(r.Context())
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, agents, 200)
+}
+
+func (h *HTTPHandler) GetAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	agent, err := h.db.GetAgent(r.Context(), botID)
+	if err != nil {
+		jsonError(w, "not found", 404)
+		return
+	}
+	jsonResp(w, agent, 200)
+}
+
+func (h *HTTPHandler) CreateAgent(w http.ResponseWriter, r *http.Request) {
+	var a db.Agent
+	if err := json.NewDecoder(r.Body).Decode(&a); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if a.BotID == "" || a.DisplayName == "" {
+		jsonError(w, "bot_id and display_name required", 400)
+		return
+	}
+	if a.Status == "" {
+		a.Status = "active"
+	}
+	if a.Model == "" {
+		a.Model = "gpt-4"
+	}
+	if err := h.db.CreateAgent(r.Context(), &a); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, a, 201)
+}
+
+func (h *HTTPHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	var a db.Agent
+	if err := json.NewDecoder(r.Body).Decode(&a); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if err := h.db.UpdateAgent(r.Context(), botID, &a); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+func (h *HTTPHandler) DeleteAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	if err := h.db.DeleteAgent(r.Context(), botID); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+// Agent Group Bindings
+
+func (h *HTTPHandler) AgentGroups(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	groups, err := h.db.GetGroupsForBot(r.Context(), botID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, groups, 200)
+}
+
+func (h *HTTPHandler) SetAgentGroups(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	var req struct {
+		GroupIDs []int64 `json:"group_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if err := h.db.SetBotGroups(r.Context(), botID, req.GroupIDs); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}

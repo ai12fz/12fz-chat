@@ -66,6 +66,15 @@ func main() {
 	api.HandleFunc("/messages", httpHandler.GetMessages).Methods("GET")
 	api.HandleFunc("/messages", httpHandler.SendMessage).Methods("POST")
 	api.HandleFunc("/messages/unread", httpHandler.GetUnreadCount).Methods("GET")
+		// Agent CRUD
+	api.HandleFunc("/agents", httpHandler.ListAgents).Methods("GET")
+	api.HandleFunc("/agents", httpHandler.CreateAgent).Methods("POST")
+	api.HandleFunc("/agents/{bot_id}", httpHandler.GetAgent).Methods("GET")
+	api.HandleFunc("/agents/{bot_id}", httpHandler.UpdateAgent).Methods("PUT")
+	api.HandleFunc("/agents/{bot_id}", httpHandler.DeleteAgent).Methods("DELETE")
+	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.AgentGroups).Methods("GET")
+	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.SetAgentGroups).Methods("PUT")
+
 	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
