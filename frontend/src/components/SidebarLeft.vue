@@ -166,10 +166,7 @@ function saveProfile() {
   const botId = profileName.value.trim()
   auth.userId = botId
   localStorage.setItem('user_id', botId)
-  // Fetch nickname from server
-  fetch('/api/whoami', { headers: { Authorization: `Bearer ${token}` } })
-    .then(r => r.json())
-    .then(d => { if (d.nickname) auth.user = d })
+  auth.fetchWhoAmI()
   profileMsg.value = '已保存'
   setTimeout(() => { profileMsg.value = '' }, 2000)
 }

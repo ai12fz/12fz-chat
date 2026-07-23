@@ -22,11 +22,26 @@ export const useAuthStore = defineStore('auth', () => {
     window.history.replaceState({}, '', cleanUrl)
   }
 
+  const userInfo = ref<{user_id?: number; nickname?: string; phone?: string}>({})
+
   const user = computed(() => ({
-    username: userId.value,
+    user_id: userInfo.value.user_id || userId.value,
+    nickname: userInfo.value.nickname || userId.value,
+    username: userInfo.value.nickname || userId.value,
     bot_id: userId.value,
     merchant_id: merchantId.value,
   }))
+
+  async function fetchWhoAmI() {
+    if (!token.value) return
+    try {
+      const res = await fetch('/api/whoami', { headers: { Authorization: `Bearer ${token.value}` } })
+      if (res.ok) {
+        const data = await res.json()
+        userInfo.value = data
+      }
+    } catch {}
+  }
 
   async function login(username: string, password: string) {
     const res = await apiLogin(username, password)
@@ -65,5 +80,5 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {}
     return userId.value
   }
-return { token, userId, expire, merchantId, user, login, logout }
+return { token, userId, expire, merchantId, user, userInfo, login, logout, fetchWhoAmI }
 })
