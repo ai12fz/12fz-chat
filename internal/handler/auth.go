@@ -86,10 +86,6 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 		}
 	}
 
-	// Support session tokens: session-{userID}
-	if strings.HasPrefix(token, "session-") {
-		return token[8:], nil
-	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("invalid token format")

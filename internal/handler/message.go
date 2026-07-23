@@ -22,32 +22,11 @@ func NewMessageHandler(database *db.DB, hub *ws.Hub) *MessageHandler {
 
 func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 	var msg struct {
-		GroupID  int64  `json:"group_id"`
-		FriendID string `json:"friend_id"`
-		Content  string `json:"content"`
+		GroupID int64  `json:"group_id"`
+		Content string `json:"content"`
 	}
 	if err := json.Unmarshal(data, &msg); err != nil {
 		log.Printf("[handler] bad message from %s: %v", senderID, err)
-		return
-	}
-
-	// Friend message: relay directly via SendToBot
-	if msg.FriendID != "" {
-		id, err := h.db.SaveFriendMessage(context.Background(), senderID, msg.FriendID, msg.Content); if err != nil { log.Printf("[handler] save friend msg error: %v", err) } else { log.Printf("[handler] saved friend msg id=%d", id) }
-		log.Printf("[handler] friend msg from=%s to=%s", senderID, msg.FriendID)
-		fm := map[string]interface{}{
-			"type":      "message",
-			"from":      senderID,
-			"to":        msg.FriendID,
-			"content":   msg.Content,
-			"timestamp": time.Now().Unix(),
-		}
-		data, _ := json.Marshal(fm)
-		broadcastData, _ := json.Marshal(ws.WSMessage{Type: "message", Data: data})
-		log.Printf("[handler] sending to friend %s", msg.FriendID)
-		h.hub.SendToBot(msg.FriendID, broadcastData)
-		log.Printf("[handler] echoing back to sender %s", senderID)
-		h.hub.SendToBot(senderID, broadcastData)
 		return
 	}
 

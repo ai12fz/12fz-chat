@@ -74,7 +74,6 @@ export const useChatStore = defineStore('chat', () => {
         unread: 0,
         lastMsg: undefined,
         messages: [],
-        members: [],
       }
       sessions.value.push(s)
     }

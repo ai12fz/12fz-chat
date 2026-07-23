@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ai12fz/12fz-chat/internal/model"
 	"github.com/ai12fz/12fz-chat/internal/db"
 	"github.com/ai12fz/12fz-chat/internal/ws"
 	"github.com/gorilla/mux"
@@ -333,59 +332,4 @@ func jsonError(w http.ResponseWriter, msg string, status int) {
 func mustJSON(v any) json.RawMessage {
 	b, _ := json.Marshal(v)
 	return b
-}
-
-
-func (h *HTTPHandler) SendFriendMessage(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		FriendID string `json:"friend_id"`
-		Content  string `json:"content"`
-	}
-	json.NewDecoder(r.Body).Decode(&req)
-	botID := getBotID(r)
-	id, err := h.db.SaveFriendMessage(r.Context(), botID, req.FriendID, req.Content)
-	if err != nil {
-		jsonError(w, err.Error(), 500)
-		return
-	}
-	fm := map[string]interface{}{
-		"type": "message", "from": botID, "to": req.FriendID,
-		"content": req.Content, "timestamp": time.Now().Unix(),
-	}
-	data, _ := json.Marshal(fm)
-	msg, _ := json.Marshal(ws.WSMessage{Type: "message", Data: data})
-	h.hub.SendToBot(req.FriendID, msg)
-	h.hub.SendToBot(botID, msg)
-	jsonResp(w, map[string]interface{}{"status": "ok", "id": id}, 200)
-}
-
-func (h *HTTPHandler) GetFriendMessages(w http.ResponseWriter, r *http.Request) {
-	botID := getBotID(r)
-	otherID := r.URL.Query().Get("with")
-	log.Printf("[api] GetFriendMessages botID=%s otherID=%s", botID, otherID)
-	log.Printf("[api] GetFriendMessages with=%s", r.URL.Query().Get("with")); log.Printf("[api] GetFriendMessages with=%s", r.URL.Query().Get("with")); msgs, err := h.db.GetFriendMessages(r.Context(), botID, otherID, 50, 0)
-	if err != nil { jsonError(w, err.Error(), 500); return }
-	if msgs == nil { msgs = make([]model.FriendMessage, 0) }
-	jsonResp(w, msgs, 200)
-}
-
-func (h *HTTPHandler) HandleFriendRequest(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		FromID string `json:"from_id"`
-		Action string `json:"action"`
-	}
-	json.NewDecoder(r.Body).Decode(&req)
-	botID := getBotID(r)
-	switch req.Action {
-	case "accept":
-		h.db.UpdateFriendStatus(r.Context(), botID, req.FromID, "accepted")
-		h.db.UpdateFriendStatus(r.Context(), req.FromID, botID, "accepted")
-	case "reject":
-		h.db.DeleteFriend(r.Context(), botID, req.FromID)
-	}
-	jsonResp(w, map[string]string{"status": "ok"}, 200)
-}
-
-func (h *HTTPHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
-	jsonResp(w, map[string]int{"count": h.hub.ConnectionCount()}, 200)
 }

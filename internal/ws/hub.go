@@ -227,9 +227,3 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, botID string, hand
 
 	go client.ReadPump([]string{botID}, handler)
 }
-
-func (h *Hub) ConnectionCount() int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return len(h.clients)
-}

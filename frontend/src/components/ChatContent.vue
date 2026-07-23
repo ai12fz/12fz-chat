@@ -78,7 +78,6 @@
 import { ref, watch, nextTick, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
-import { getFriendMessages, sendFriendMessage } from "../api"
 import { useWebSocket } from '../composables/useWebSocket'
 
 const auth = useAuthStore()
@@ -112,11 +111,6 @@ function handleSend() {
   const match = session.value.id.match(/^group:(\d+)$/)
   if (match) {
     ws.sendMessage(parseInt(match[1]), content)
-  }
-  const fmatch = session.value.id.match(/^friend:(.+)$/)
-  if (fmatch) {
-    ws.sendMessage(fmatch[1], content)
-    sendFriendMessage(fmatch[1], content).catch(function(){})
   }
   text.value = ''
   showEmoji.value = false
@@ -176,24 +170,6 @@ watch(() => chat.activeId, async () => {
   await nextTick()
   if (msgListRef.value) {
     msgListRef.value.scrollTop = msgListRef.value.scrollHeight
-  }
-  const sid = chat.activeId
-  if (sid && sid.startsWith("friend:")) {
-    const fid = sid.replace("friend:", "")
-    const tok = localStorage.getItem("token") || ""
-    const myId = tok.startsWith("session-") ? tok.slice(8) : tok
-    try {
-      const msgs = await getFriendMessages(myId, fid)
-      if (msgs && msgs.length > 0) {
-        msgs.reverse()
-        const s = chat.sessions.find(function(x){ return x.id === sid })
-        if (s) {
-          s.messages = msgs.map(function(m){
-            return { id: m.ID, group_id: 0, sender_id: m.FromID, content: m.Content, msg_type: "text", created_at: m.CreatedAt }
-          })
-        }
-      }
-    } catch(e) { console.error("Failed to load friend messages:", e) }
   }
 })
 </script>
