@@ -144,6 +144,15 @@ async function loadFriends() {
   try {
     const res = await getFriends(userId)
     friends.value = Array.isArray(res) ? res.map(function(f: any){ return f }) : []
+    // Create friend sessions in chat store so they appear in sidebar
+    for (const f of friends.value) {
+      const fid = String(f.friend_id)
+      const sid = 'friend:' + fid
+      const exists = chat.sessions.find(function(s: any){ return s.id === sid })
+      if (!exists) {
+        chat.sessions.push({ id: sid, name: fid, type: 'friend', messages: [], members: [], lastMsgAt: new Date(0).toISOString() })
+      }
+    }
   } catch(e) { console.error('Failed to load friends:', e) }
 }
 
