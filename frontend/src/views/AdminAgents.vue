@@ -145,7 +145,7 @@ const saving = ref(false)
 const error = ref('')
 
 const form = ref<Agent>({
-  id: 0, bot_id: '', display_name: '', model: 'gpt-4', system_prompt: '', capabilities: [], status: 'active'
+  id: 0, bot_id: '', display_name: '', model: 'tk.12fz.com', system_prompt: '', capabilities: [], status: 'active'
 })
 
 async function load() {
@@ -175,7 +175,7 @@ onMounted(() => { load(); loadGroups() })
 
 function openCreate() {
   editing.value = null
-  form.value = { id: 0, bot_id: '', display_name: '', model: 'gpt-4', system_prompt: '', capabilities: [], status: 'active' }
+  form.value = { id: 0, bot_id: '', display_name: '', model: 'tk.12fz.com', system_prompt: '', capabilities: [], status: 'active' }
   error.value = ''
   showForm.value = true
 }
