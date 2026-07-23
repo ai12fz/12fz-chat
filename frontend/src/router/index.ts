@@ -4,7 +4,7 @@ import ChatView from '../views/ChatView.vue'
 import AdminAgents from '../views/AdminAgents.vue'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', redirect: '/chat' },
     { path: '/login', name: 'login', component: LoginView },
@@ -14,6 +14,17 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  // Handle token from URL query param (for email links)
+  const urlToken = to.query.token as string
+  if (urlToken && !localStorage.getItem('token')) {
+    localStorage.setItem('token', urlToken)
+    const botId = urlToken.startsWith('session-') ? urlToken.slice(8) : urlToken
+    localStorage.setItem('bot_id', botId)
+    // Redirect to clean URL
+    next({ path: to.path, replace: true })
+    return
+  }
+
   const token = localStorage.getItem('token')
   if (to.meta.requiresAuth && !token) {
     next('/login')
