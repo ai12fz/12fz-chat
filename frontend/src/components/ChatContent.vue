@@ -231,6 +231,8 @@ watch(() => chat.activeId, async () => {
             return { id: m.ID, group_id: 0, sender_id: m.FromID, content: m.Content, msg_type: "text", created_at: m.CreatedAt }
           })
           chat.sessions[idx].unread = 0
+          const fid2 = sid.replace("friend:", "")
+          markRead(parseInt(fid2), msgs[msgs.length - 1].ID)
         }
       }
     } catch(e) {}
