@@ -236,7 +236,7 @@ watch(() => chat.activeId, async () => {
       if (msgs && msgs.length > 0) {
         const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
         if (idx >= 0) {
-          chat.sessions[idx].messages = msgs.map(function(m){
+          chat.sessions[idx].messages = msgs.slice().reverse().map(function(m){
             return { id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)), content: m.content, msg_type: "text", created_at: m.created_at }
           })
           chat.sessions[idx].unread = 0
