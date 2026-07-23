@@ -146,7 +146,9 @@ func (d *DB) GetMessages(ctx context.Context, groupID int64, limit, offset int) 
 
 type GroupWithMeta struct {
 	model.Group
-	LastMsgAt time.Time `json:"last_msg_at"`
+	LastMsgAt     time.Time `json:"last_msg_at"`
+	LastReadMsgID int64     `json:"last_read_msg_id"`
+	Unread        int       `json:"unread"`
 }
 
 func (d *DB) CreateGroup(ctx context.Context, name, createdBy string) (*model.Group, error) {
@@ -168,7 +170,7 @@ func (d *DB) ListGroups(ctx context.Context) ([]GroupWithMeta, error) {
 	var groups []GroupWithMeta
 	for rows.Next() {
 		var g GroupWithMeta
-		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt, &g.LastReadMsgID, &g.Unread); err != nil {
 			return nil, err
 		}
 		groups = append(groups, g)
@@ -179,7 +181,9 @@ func (d *DB) ListGroups(ctx context.Context) ([]GroupWithMeta, error) {
 // ListGroupsForUser returns groups the user is a member of, sorted by last_msg_at DESC
 func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMeta, error) {
 	rows, err := d.pool.Query(ctx,
-		`SELECT g.id, g.name, g.created_by, g.created_at, g.last_msg_at
+		`SELECT g.id, g.name, g.created_by, g.created_at, g.last_msg_at,
+		       m.last_read_msg_id,
+		       (SELECT COUNT(*) FROM chat.messages WHERE group_id = g.id AND id > COALESCE(m.last_read_msg_id, 0)) as unread
 		 FROM chat.groups g
 		 JOIN chat.group_members m ON m.group_id = g.id
 		 WHERE m.bot_id = $1
@@ -191,7 +195,7 @@ func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMe
 	var groups []GroupWithMeta
 	for rows.Next() {
 		var g GroupWithMeta
-		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt, &g.LastReadMsgID, &g.Unread); err != nil {
 			return nil, err
 		}
 		groups = append(groups, g)

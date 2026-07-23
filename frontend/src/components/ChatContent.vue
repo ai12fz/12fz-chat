@@ -179,6 +179,17 @@ watch(
 )
 
 // Scroll when switching sessions
+
+async function markRead(groupId: number, msgId: number) {
+  try {
+    await fetch("/api/messages/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+      body: JSON.stringify({ group_id: groupId, msg_id: msgId })
+    })
+  } catch(e) {}
+}
+
 watch(() => chat.activeId, async () => { console.log("[chat] loading messages for", chat.activeId)
   await nextTick()
   if (msgListRef.value) {
