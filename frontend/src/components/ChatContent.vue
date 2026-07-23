@@ -179,7 +179,7 @@ watch(
 )
 
 // Scroll when switching sessions
-watch(() => chat.activeId, async () => {
+watch(() => chat.activeId, async () => { console.log("[chat] loading messages for", chat.activeId)
   await nextTick()
   if (msgListRef.value) {
     msgListRef.value.scrollTop = msgListRef.value.scrollHeight
@@ -223,7 +223,7 @@ watch(() => chat.activeId, async () => {
       }
     } catch(e) { console.error("Failed to load friend messages:", e) }
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
