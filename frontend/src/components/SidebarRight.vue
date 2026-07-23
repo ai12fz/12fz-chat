@@ -49,9 +49,9 @@
 
         <div class="member-section" v-if="session?.members?.length">
           <div class="section-title">群成员（{{ session.members.length }}）</div>
-          <div v-for="m in session.members" :key="m.bot_id" class="member-item">
-            <span class="member-avatar" :style="{ background: nameColor(m.bot_id) }">{{ m.bot_id[0] }}</span>
-            <span class="member-name">{{ m.bot_id }}</span>
+          <div v-for="m in session.members" :key="m.user_id" class="member-item">
+            <span class="member-avatar" :style="{ background: nameColor(m.user_id) }">{{ m.user_id[0] }}</span>
+            <span class="member-name">{{ m.user_id }}</span>
             <span v-if="m.role === 'admin'" class="member-badge">群主</span>
           </div>
         </div>
@@ -107,7 +107,7 @@ async function fetchStatus() {
   const botId = session.value.name
   const token = localStorage.getItem('token') || ''
   try {
-    const resp = await fetch(`/api/agent-status?bot_id=${encodeURIComponent(botId)}`, {
+    const resp = await fetch(`/api/agent-status?user_id=${encodeURIComponent(botId)}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
     if (resp.ok) {

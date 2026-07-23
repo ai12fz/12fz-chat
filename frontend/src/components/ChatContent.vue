@@ -13,7 +13,7 @@
       <!-- Messages -->
       <div class="message-list" ref="msgListRef">
         <div v-for="msg in session.messages" :key="msg.id" class="message-row">
-          <div v-if="msg.sender_id === auth.user?.username || msg.sender_id === auth.user?.bot_id" class="message self">
+          <div v-if="msg.sender_id === auth.userId || msg.sender_id === auth.userId" class="message self">
             <div class="msg-body">
               <div class="msg-content self-msg">{{ msg.content }}</div>
               <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
@@ -129,7 +129,7 @@ function handleSend() {
         session.value.messages.push({
           id: res.id,
           group_id: fmatch[1],
-          sender_id: auth.user?.username || auth.user?.bot_id || 'me',
+          sender_id: auth.userId || auth.userId || 'me',
           content: content,
           msg_type: 'text',
           created_at: new Date().toISOString()
@@ -237,7 +237,7 @@ watch(() => chat.activeId, async () => {
         const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
         if (idx >= 0) {
           chat.sessions[idx].messages = msgs.map(function(m){
-            return { id: m.ID, group_id: 0, sender_id: m.FromID, content: m.Content, msg_type: "text", created_at: m.CreatedAt }
+            return { id: m.ID, group_id: 0, sender_id: parseInt(m.FromID), content: m.Content, msg_type: "text", created_at: m.CreatedAt }
           })
           chat.sessions[idx].unread = 0
           const fid2 = sid.replace("friend:", "")

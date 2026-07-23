@@ -7,13 +7,13 @@ import (
 )
 
 type Config struct {
-	Port       int
-	PGConnStr  string
-	JWTSecret  string
-	AdminBotID string
-	AdminPass  string
-	BotTokens  map[string]string // bot_id -> token
-	UserMap    map[string]string // numeric_id -> username (for session tokens)
+	Port        int
+	PGConnStr   string
+	ZhongTaiDSN string
+	JWTSecret   string
+	AdminBotID  string
+	AdminPass   string
+	BotTokens   map[string]string // bot_id -> token
 }
 
 // PGConnString method to satisfy db.Connect interface
@@ -29,24 +29,14 @@ func Load() *Config {
 			}
 		}
 	}
-	// Parse USER_MAP
-	um := make(map[string]string)
-	if umStr := getEnv("USER_MAP", ""); umStr != "" {
-		for _, pair := range strings.Split(umStr, ",") {
-			parts := strings.SplitN(pair, ":", 2)
-			if len(parts) == 2 {
-				um[parts[0]] = parts[1]
-			}
-		}
-	}
 	return &Config{
-		Port:       getEnvInt("PORT", 8081),
-		PGConnStr:  getEnv("PG_CONN", "postgresql://gong3:***@localhost:5432/aichat?sslmode=disable"),
-		JWTSecret:  getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
-		AdminBotID: getEnv("ADMIN_BOT_ID", "admin"),
-		AdminPass:  getEnv("ADMIN_PASS", "admin123"),
-		BotTokens:  bt,
-		UserMap:    um,
+		Port:        getEnvInt("PORT", 8081),
+		PGConnStr:   getEnv("PG_CONN", "postgresql://gong3:***@localhost:5432/aichat?sslmode=disable"),
+		ZhongTaiDSN: getEnv("ZHONGTAI_DSN", "postgresql://app_zhongtai:app123456@localhost:5432/12fzsj?sslmode=disable"),
+		JWTSecret:   getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
+		AdminBotID:  getEnv("ADMIN_BOT_ID", "admin"),
+		AdminPass:   getEnv("ADMIN_PASS", "admin123"),
+		BotTokens:   bt,
 	}
 }
 

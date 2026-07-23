@@ -100,7 +100,7 @@ const showProfile = ref(false)
 const profileName = ref('')
 const profileMsg = ref('')
 
-const displayName = computed(() => auth.user?.username || auth.user?.bot_id || '用户')
+const displayName = computed(() => auth.user?.username || auth.user?.user_id || '用户')
 
 const filteredSessions = computed(() => {
   const sortFn = (a: any, b: any) => { const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 }
@@ -132,7 +132,7 @@ function avatarColor(s: { name: string }) {
 
 async function loadFriends() {
   const token = localStorage.getItem('token') || ''
-  const userId = token.startsWith('session-') ? token.slice(8) : auth.user?.bot_id || auth.user?.username
+  const userId = token.startsWith('session-') ? token.slice(8) : auth.user?.user_id || auth.user?.username
   if (!userId) return
   try {
     const res = await getFriends(userId)
@@ -163,8 +163,8 @@ function saveProfile() {
   }
   // Update in auth store and localStorage
   const botId = profileName.value.trim()
-  auth.botId = botId
-  localStorage.setItem('bot_id', botId)
+  auth.userId = botId
+  localStorage.setItem('user_id', botId)
   profileMsg.value = '已保存'
   setTimeout(() => { profileMsg.value = '' }, 2000)
 }

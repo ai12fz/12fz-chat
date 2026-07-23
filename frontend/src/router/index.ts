@@ -18,8 +18,8 @@ router.beforeEach((to, _from, next) => {
   const urlToken = to.query.token as string
   if (urlToken && !localStorage.getItem('token')) {
     localStorage.setItem('token', urlToken)
-    const botId = urlToken.startsWith('session-') ? urlToken.slice(8) : urlToken
-    localStorage.setItem('bot_id', botId)
+    const userId = urlToken.startsWith('session-') ? parseInt(urlToken.slice(8)) : parseInt(urlToken)
+    localStorage.setItem('user_id', String(userId))
     // Redirect to clean URL
     next({ path: to.path, replace: true })
     return

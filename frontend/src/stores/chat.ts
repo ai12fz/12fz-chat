@@ -13,7 +13,7 @@ export interface GroupInfo {
 
 export interface GroupMember {
   group_id: number
-  bot_id: string
+  user_id: number
   role: string
   joined_at: string
   last_read_msg_id?: number
@@ -21,7 +21,7 @@ export interface GroupMember {
 
 export interface FriendInfo {
   user_id: string
-  friend_id: string
+  friend_id: number
   status: string
   created_at: string
 }
@@ -29,7 +29,7 @@ export interface FriendInfo {
 export interface BackendMessage {
   id: number
   group_id: number
-  sender_id: string
+  sender_id: number
   content: string
   msg_type: string
   created_at: string
@@ -38,7 +38,7 @@ export interface BackendMessage {
 export interface ChatSession {
   id: string           // "group:123" or "user:abc"
   name: string
-  type: 'group' | 'user'
+  type: 'group' | 'friend'
   unread: number
   lastMsg?: string
   lastMsgAt?: string

@@ -308,6 +308,16 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, friends, 200)
 }
 
+// ── WhoAmI ──
+
+func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	jsonResp(w, map[string]string{
+		"bot_id": botID,
+		"username": botID,
+	}, 200)
+}
+
 // ── Health ──
 
 func (h *HTTPHandler) Health(w http.ResponseWriter, r *http.Request) {
