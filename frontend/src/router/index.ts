@@ -14,15 +14,15 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
-  // Handle token from URL query param (for email links)
+  // Handle token from URL query param
   const urlToken = to.query.token as string
-  if (urlToken && !localStorage.getItem('token')) {
+  if (urlToken) {
     localStorage.setItem('token', urlToken)
     const userId = urlToken.startsWith('session-') ? parseInt(urlToken.slice(8)) : parseInt(urlToken)
     localStorage.setItem('user_id', String(userId))
-    // Redirect to clean URL
-    next({ path: to.path, replace: true })
-    return
+    // Clean URL
+    const cleanUrl = to.path + (to.hash || '')
+    window.history.replaceState({}, '', cleanUrl)
   }
 
   const token = localStorage.getItem('token')
