@@ -170,8 +170,8 @@ function saveProfile() {
   }
   // Update in auth store and localStorage
   const botId = profileName.value.trim()
-  auth.userId = botId
-  localStorage.setItem('user_id', botId)
+  // DONT overwrite user_id
+  localStorage.setItem('nickname', botId)
   auth.fetchWhoAmI()
   profileMsg.value = '已保存'
   setTimeout(() => { profileMsg.value = '' }, 2000)
