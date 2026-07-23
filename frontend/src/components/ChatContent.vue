@@ -13,7 +13,7 @@
       <!-- Messages -->
       <div class="message-list" ref="msgListRef">
         <div v-for="msg in session.messages" :key="msg.id" class="message-row">
-          <div v-if="msg.sender_id === auth.userId || msg.sender_id === auth.userId" class="message self">
+          <div v-if="String(msg.sender_id) === String(auth.userId)" class="message self">
             <div class="msg-body">
               <div class="msg-content self-msg">{{ msg.content }}</div>
               <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
