@@ -1,6 +1,7 @@
 <template>
   <main class="chat-content">
-    <template v-if="session">
+    <div style="position:fixed;top:0;right:0;background:#ff0;padding:2px 8px;z-index:9999;font-size:11px">{{ debugInfo }}</div>
+  <template v-if="session">
       <!-- Header -->
       <div class="chat-header">
         <span class="chat-title">{{ session.name }}</span>
@@ -92,6 +93,12 @@ const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
 
 const session = computed(() => chat.activeSession)
+  // DEBUG
+  const debugInfo = ref("loading...")
+  watch(() => chat.activeSession, (s) => {
+    if (s) debugInfo.value = s.id + " msgs:" + s.messages.length + " unread:" + s.unread
+    else debugInfo.value = "no session"
+  }, { immediate: true })
 
 const emojis = ['😊', '😂', '🤣', '❤️', '👍', '😍', '🥰', '😘', '😜', '😎',
   '🤔', '🙄', '😏', '😴', '🥱', '😭', '😤', '😡', '🤬', '👋',
@@ -190,18 +197,17 @@ async function markRead(groupId: number, msgId: number) {
   } catch(e) {}
 }
 
-watch(() => chat.activeId, async () => { console.log("[chat] loading messages for", chat.activeId)
+watch(() => chat.activeId, async () => {
   await nextTick()
   if (msgListRef.value) {
     msgListRef.value.scrollTop = msgListRef.value.scrollHeight
   }
   const sid = chat.activeId
   if (!sid) return
-  // Load group messages
+  const tok = localStorage.getItem("token") || ""
   const gmatch = sid.match(/^group:(\d+)$/)
   if (gmatch) {
     try {
-      const tok = localStorage.getItem("token") || ""
       const resp = await fetch("/api/messages?group_id=" + gmatch[1] + "&limit=50", {
         headers: { Authorization: "Bearer " + tok }
       })
@@ -209,31 +215,32 @@ watch(() => chat.activeId, async () => { console.log("[chat] loading messages fo
         const msgs = await resp.json()
         if (msgs && msgs.length > 0) {
           msgs.reverse()
-          const s = chat.sessions.find(function(x){ return x.id === sid })
-          console.log("[chat] loaded", msgs.length, "msgs from group", gmatch[1]); if (s) { s.messages = msgs; s.unread = 0 }
+          const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+          if (idx >= 0) {
+            chat.sessions[idx].messages = msgs
+            chat.sessions[idx].unread = 0
+          }
         }
       }
-    } catch(e) { console.error("Failed to load group messages:", e) }
+    } catch(e) {}
     return
   }
-  // Load friend messages
   if (sid.startsWith("friend:")) {
     const fid = sid.replace("friend:", "")
-    const tok = localStorage.getItem("token") || ""
     const myId = tok.startsWith("session-") ? tok.slice(8) : tok
     try {
       const msgs = await getFriendMessages(myId, fid)
       if (msgs && msgs.length > 0) {
         msgs.reverse()
-        const s = chat.sessions.find(function(x){ return x.id === sid })
-        if (s) {
-          s.messages = msgs.map(function(m){
+        const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+        if (idx >= 0) {
+          chat.sessions[idx].messages = msgs.map(function(m){
             return { id: m.ID, group_id: 0, sender_id: m.FromID, content: m.Content, msg_type: "text", created_at: m.CreatedAt }
           })
-          s.unread = 0
+          chat.sessions[idx].unread = 0
         }
       }
-    } catch(e) { console.error("Failed to load friend messages:", e) }
+    } catch(e) {}
   }
 }, { immediate: true })
 </script>
