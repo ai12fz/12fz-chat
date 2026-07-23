@@ -86,7 +86,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
-import { getFriends } from '../api'
+import { getFriends, getFriendMessages } from '../api'
 import AddFriendDialog from './AddFriendDialog.vue'
 
 const router = useRouter()
@@ -153,6 +153,21 @@ async function loadFriends() {
         chat.sessions.push({ id: sid, name: fid, type: 'friend', messages: [], members: [], lastMsgAt: new Date(0).toISOString() })
       }
     }
+    // Load recent friend messages to get proper lastMsgAt for sorting
+    friends.value.forEach(async function(f: any) {
+      try {
+        const fid = String(f.friend_id)
+        const sid = 'friend:' + fid
+        const msgs = await getFriendMessages(userId, fid)
+        if (msgs && msgs.length > 0) {
+          const session = chat.sessions.find(function(s: any){ return s.id === sid })
+          if (session) {
+            session.lastMsgAt = msgs[0].created_at
+            session.lastMsg = msgs[0].content
+          }
+        }
+      } catch(e) {}
+    })
   } catch(e) { console.error('Failed to load friends:', e) }
 }
 
