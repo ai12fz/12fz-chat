@@ -12,7 +12,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { useWebSocket } from '../composables/useWebSocket'
-import { getMyGroups } from '../api'
+import { getMyGroups, getMessages } from '../api'
 import SidebarLeft from '../components/SidebarLeft.vue'
 import ChatContent from '../components/ChatContent.vue'
 import SidebarRight from '../components/SidebarRight.vue'
@@ -51,6 +51,20 @@ onMounted(async () => {
       }
     } catch { /* unread endpoint may not have data */ }
 
+    // Load messages for all groups immediately
+    for (const g of groups) {
+      try {
+        const sid = chat.groupSessionId(g.id)
+        const msgs = await getMessages(g.id, 50, 0)
+        if (msgs && msgs.length > 0) {
+          const sessionMsgs = [...msgs].reverse()
+          const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+          if (idx >= 0) {
+            chat.sessions[idx].messages = sessionMsgs
+          }
+        }
+      } catch(e) { console.error("load error:", e) }
+    }
     // Select first session
     if (firstId) chat.setActive(firstId)
   } catch (err) {
