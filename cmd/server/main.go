@@ -50,7 +50,8 @@ func main() {
 
 	// Health check (public)
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
-
+	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
+	
 	// Login (public)
 	r.HandleFunc("/api/login", authHandler.Login).Methods("POST")
 
