@@ -214,6 +214,7 @@ watch(() => chat.activeId, async () => {
         if (idx >= 0) {
           chat.sessions[idx].messages = msgs
           chat.sessions[idx].unread = 0
+          markRead(parseInt(gmatch[1]), msgs[msgs.length - 1].id)
         }
       }
     } catch(e) {}
