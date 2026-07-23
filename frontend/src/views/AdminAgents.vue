@@ -48,13 +48,13 @@
         <div class="form-group">
           <label>模型</label>
           <select v-model="form.model">
+            <option value="tk.12fz.com">tk.12fz.com (中转)</option>
             <option value="gpt-4">GPT-4</option>
             <option value="gpt-4o">GPT-4o</option>
             <option value="gpt-3.5-turbo">GPT-3.5</option>
             <option value="claude-sonnet-4">Claude Sonnet 4</option>
             <option value="deepseek-v3">DeepSeek V3</option>
             <option value="qwen-max">Qwen Max</option>
-            <option value="tk.12fz.com">tk.12fz.com (中转)</option>
           </select>
         </div>
         <div class="form-group">
