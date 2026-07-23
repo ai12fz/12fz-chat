@@ -1,7 +1,7 @@
 <template>
   <aside class="sidebar-left">
     <div class="sidebar-header">
-      <div class="user-info" @click="showProfile = true" title="查看/编辑个人信息">
+      <div class="user-info" @click="showProfile = true; console.log(profile-open, auth.userId)" title="查看/编辑个人信息">
         <span class="avatar">{{ displayName[0] }}</span>
         <span class="name">{{ displayName }} <small style="color:#999;font-size:12px">#{{ auth.userId || auth.user?.user_id }}</small></span>
       </div>
