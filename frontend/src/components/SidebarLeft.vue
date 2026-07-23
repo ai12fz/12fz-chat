@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
@@ -91,6 +91,8 @@ import AddFriendDialog from './AddFriendDialog.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+onMounted(() => { console.log("SIDEBAR: userId=", auth.userId, "ls=", localStorage.getItem("user_id"), "user=", auth.user) })
+
 const displayUserId = computed(() => {
   const uid = localStorage.getItem("user_id")
   return uid || auth.userId || auth.user?.user_id || ""
