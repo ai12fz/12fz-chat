@@ -123,7 +123,21 @@ function handleSend() {
   const fmatch = session.value.id.match(/^friend:(.+)$/)
   if (fmatch) {
     ws.sendMessage(fmatch[1], content)
-    sendFriendMessage(fmatch[1], content).catch(function(){})
+    sendFriendMessage(fmatch[1], content).then(res => {
+      // Add to local message list immediately (friend WS echo not supported)
+      if (session.value && res && res.id) {
+        session.value.messages.push({
+          id: res.id,
+          group_id: fmatch[1],
+          sender_id: auth.user?.username || auth.user?.bot_id || 'me',
+          content: content,
+          msg_type: 'text',
+          created_at: new Date().toISOString()
+        })
+        session.value.lastMsg = content
+        session.value.lastMsgAt = new Date().toISOString()
+      }
+    }).catch(function(){})
     if (session.value) session.value.lastMsgAt = new Date().toISOString()
   }
   text.value = ''
