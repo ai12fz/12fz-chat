@@ -67,7 +67,8 @@
         <div class="profile-avatar" :style="{ background: avatarColor({name: displayName}) }">{{ displayName[0] }}</div>
         <h3>{{ displayName }}</h3>
         <div class="profile-form">
-          <label>用户名</label>
+          <label>昵称</label>
+        <span class="user-id-tag">ID: {{ auth.userId || auth.user?.user_id || '—' }}</span>
           <input v-model="profileName" placeholder="输入新名称" />
           <button class="save-btn" @click="saveProfile">保存</button>
           <p v-if="profileMsg" class="profile-msg">{{ profileMsg }}</p>
@@ -100,7 +101,7 @@ const showProfile = ref(false)
 const profileName = ref('')
 const profileMsg = ref('')
 
-const displayName = computed(() => auth.user?.username || auth.user?.user_id || '用户')
+const displayName = computed(() => auth.user?.nickname || auth.user?.user_id || '用户')
 
 const filteredSessions = computed(() => {
   const sortFn = (a: any, b: any) => { const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 }
@@ -165,6 +166,10 @@ function saveProfile() {
   const botId = profileName.value.trim()
   auth.userId = botId
   localStorage.setItem('user_id', botId)
+  // Fetch nickname from server
+  fetch('/api/whoami', { headers: { Authorization: `Bearer ${token}` } })
+    .then(r => r.json())
+    .then(d => { if (d.nickname) auth.user = d })
   profileMsg.value = '已保存'
   setTimeout(() => { profileMsg.value = '' }, 2000)
 }

@@ -2,6 +2,7 @@
   <div v-if="visible" class="dialog-overlay" @click.self="close">
     <div class="dialog-card">
       <h3>添加好友</h3>
+      <label style="display:block;margin-bottom:4px;font-size:13px;color:#666">请输入好友的用户ID</label>
       <input v-model="friendId" placeholder="输入 go.12fz.com 用户ID" @keyup.enter="submit" />
       <div v-if="error" class="error">{{ error }}</div>
       <div v-if="tip" class="tip">{{ tip }}</div>
