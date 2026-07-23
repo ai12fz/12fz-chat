@@ -112,6 +112,12 @@ function handleSend() {
   const match = session.value.id.match(/^group:(\d+)$/)
   if (match) {
     ws.sendMessage(parseInt(match[1]), content)
+    // REST API fallback
+    fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+      body: JSON.stringify({ group_id: parseInt(match[1]), content })
+    }).catch(function(){})
   }
   const fmatch = session.value.id.match(/^friend:(.+)$/)
   if (fmatch) {
