@@ -57,7 +57,7 @@ onMounted(async () => {
         const sid = chat.groupSessionId(g.id)
         const msgs = await getMessages(g.id, 50, 0)
         if (msgs && msgs.length > 0) {
-          const sessionMsgs = [...msgs].reverse()
+          const sessionMsgs = msgs
           const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
           if (idx >= 0) {
             chat.sessions[idx].messages = sessionMsgs

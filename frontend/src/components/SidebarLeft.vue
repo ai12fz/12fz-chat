@@ -102,9 +102,24 @@ const profileMsg = ref('')
 const displayName = computed(() => auth.user?.username || auth.user?.bot_id || '用户')
 
 const filteredSessions = computed(() => {
-  if (!search.value) return chat.sessions.slice().sort((a: any, b: any) => { const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 })
-  const q = search.value.toLowerCase()
-  return chat.sessions.filter((s: any) => s.name.toLowerCase().includes(q)).sort((a: any, b: any) => { const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 })
+  const sortFn = (a: any, b: any) => { const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 }
+  const activeId = chat.activeId
+  let list: any[] = []
+  if (!search.value) {
+    list = chat.sessions.slice().sort(sortFn)
+  } else {
+    const q = search.value.toLowerCase()
+    list = chat.sessions.filter((s: any) => s.name.toLowerCase().includes(q)).sort(sortFn)
+  }
+  // Active session always first
+  if (activeId) {
+    const idx = list.findIndex((s: any) => s.id === activeId)
+    if (idx > 0) {
+      const [active] = list.splice(idx, 1)
+      list.unshift(active)
+    }
+  }
+  return list
 })
 
 function avatarColor(s: { name: string }) {

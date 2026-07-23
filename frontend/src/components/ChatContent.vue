@@ -210,7 +210,6 @@ watch(() => chat.activeId, async () => {
     try {
       const msgs = await getMessages(parseInt(gmatch[1]), 50, 0)
       if (msgs && msgs.length > 0) {
-        msgs.reverse()
         const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
         if (idx >= 0) {
           chat.sessions[idx].messages = msgs
@@ -226,7 +225,6 @@ watch(() => chat.activeId, async () => {
     try {
       const msgs = await getFriendMessages(myId, fid)
       if (msgs && msgs.length > 0) {
-        msgs.reverse()
         const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
         if (idx >= 0) {
           chat.sessions[idx].messages = msgs.map(function(m){
