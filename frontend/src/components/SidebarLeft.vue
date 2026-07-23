@@ -3,7 +3,7 @@
     <div class="sidebar-header">
       <div class="user-info" @click="showProfile = true" title="查看/编辑个人信息">
         <span class="avatar">{{ displayName[0] }}</span>
-        <span class="name">{{ displayName }}</span>
+        <span class="name">{{ displayName }} <small style="color:#999;font-size:12px">#{{ auth.userId || auth.user?.user_id }}</small></span>
       </div>
       <button class="logout-btn" @click="handleLogout" title="退出登录">退出</button>
       <button class="admin-btn" @click="$router.push('/admin/agents')" title="Agent管理">⚙ 管理</button>
