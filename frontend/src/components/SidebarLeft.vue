@@ -110,7 +110,7 @@ const profileMsg = ref('')
 const displayName = computed(() => auth.user?.nickname || auth.user?.user_id || '用户')
 
 const filteredSessions = computed(() => {
-  const sortFn = (a: any, b: any) => { const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 }
+  const sortFn = (a: any, b: any) => { if (a.unread && !b.unread) return -1; if (!a.unread && b.unread) return 1; const ta = a.lastMsgAt || '', tb = b.lastMsgAt || ''; return ta > tb ? -1 : ta < tb ? 1 : 0 }
   const activeId = chat.activeId
   let list: any[] = []
   if (!search.value) {
