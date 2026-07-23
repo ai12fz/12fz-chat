@@ -321,3 +321,48 @@ func (d *DB) CreateAndReturnMessage(ctx context.Context, groupID int64, senderID
 	).Scan(&m.ID, &m.CreatedAt)
 	return m, err
 }
+
+
+func (d *DB) SaveFriendMessage(ctx context.Context, fromID, toID, content string) (int64, error) {
+	var id int64
+	err := d.pool.QueryRow(ctx,
+		"INSERT INTO chat.friend_messages (from_id, to_id, content) VALUES ($1, $2, $3) RETURNING id",
+		fromID, toID, content).Scan(&id)
+	return id, err
+}
+
+func (d *DB) GetFriendMessages(ctx context.Context, userID, otherID string, limit, offset int) ([]model.FriendMessage, error) {
+	rows, err := d.pool.Query(ctx,
+		`SELECT id, from_id, to_id, content, created_at FROM chat.friend_messages
+		 WHERE (from_id=$1 AND to_id=$2) OR (from_id=$2 AND to_id=$1)
+		 ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+		userID, otherID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var msgs []model.FriendMessage
+	for rows.Next() {
+		var m model.FriendMessage
+		if err := rows.Scan(&m.ID, &m.FromID, &m.ToID, &m.Content, &m.CreatedAt); err != nil {
+			continue
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, nil
+}
+
+
+func (d *DB) UpdateFriendStatus(ctx context.Context, userID, friendID, status string) error {
+	_, err := d.pool.Exec(ctx,
+		"UPDATE chat.friends SET status=$1 WHERE user_id=$2 AND friend_id=$3",
+		status, userID, friendID)
+	return err
+}
+
+func (d *DB) DeleteFriend(ctx context.Context, userID, friendID string) error {
+	_, err := d.pool.Exec(ctx,
+		"DELETE FROM chat.friends WHERE user_id=$1 AND friend_id=$2",
+		userID, friendID)
+	return err
+}

@@ -36,7 +36,7 @@ onMounted(async () => {
     const groups = await getMyGroups()
     let firstId = ''
 
-    groups.forEach((g: any) => {
+    if (groups && Array.isArray(groups)) groups.forEach((g: any) => {
       chat.ensureGroupSession(g)
       if (!firstId) firstId = chat.groupSessionId(g.id)
     })

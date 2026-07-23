@@ -50,7 +50,8 @@ func main() {
 
 	// Health check (public)
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
-
+	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
+	
 	// Login (public)
 	r.HandleFunc("/api/login", authHandler.Login).Methods("POST")
 
@@ -68,6 +69,10 @@ func main() {
 	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
+
+	api.HandleFunc("/friends/action", httpHandler.HandleFriendRequest).Methods("POST")
+	api.HandleFunc("/friend-messages", httpHandler.SendFriendMessage).Methods("POST")
+	api.HandleFunc("/friend-messages", httpHandler.GetFriendMessages).Methods("GET")
 
 	// WebSocket - token-based auth
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
