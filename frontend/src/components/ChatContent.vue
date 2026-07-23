@@ -199,7 +199,7 @@ watch(() => chat.activeId, async () => { console.log("[chat] loading messages fo
         if (msgs && msgs.length > 0) {
           msgs.reverse()
           const s = chat.sessions.find(function(x){ return x.id === sid })
-          if (s) s.messages = msgs
+          if (s) { s.messages = msgs; s.unread = 0 }
         }
       }
     } catch(e) { console.error("Failed to load group messages:", e) }
@@ -219,6 +219,7 @@ watch(() => chat.activeId, async () => { console.log("[chat] loading messages fo
           s.messages = msgs.map(function(m){
             return { id: m.ID, group_id: 0, sender_id: m.FromID, content: m.Content, msg_type: "text", created_at: m.CreatedAt }
           })
+          s.unread = 0
         }
       }
     } catch(e) { console.error("Failed to load friend messages:", e) }
