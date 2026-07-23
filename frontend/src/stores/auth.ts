@@ -6,6 +6,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
   const botId = ref(localStorage.getItem('bot_id') || '')
   const expire = ref(Number(localStorage.getItem('expire') || '0'))
+  const merchantId = ref(localStorage.getItem('merchant_id') || '')
 
   
   // Read token from URL query param (for email links)
@@ -24,6 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = computed(() => ({
     username: botId.value,
     bot_id: botId.value,
+    merchant_id: merchantId.value,
   }))
 
   async function login(username: string, password: string) {
@@ -35,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('token', res.token)
     localStorage.setItem('bot_id', res.bot_id)
     localStorage.setItem('expire', String(res.expire))
+    if (res.merchant_id) { merchantId.value = res.merchant_id; localStorage.setItem('merchant_id', res.merchant_id) }
   }
 
   function logout() {
