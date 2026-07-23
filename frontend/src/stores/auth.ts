@@ -7,6 +7,20 @@ export const useAuthStore = defineStore('auth', () => {
   const botId = ref(localStorage.getItem('bot_id') || '')
   const expire = ref(Number(localStorage.getItem('expire') || '0'))
 
+  
+  // Read token from URL query param (for email links)
+  const urlParams = new URLSearchParams(window.location.search)
+  const urlToken = urlParams.get('token')
+  if (urlToken && !token.value) {
+    token.value = urlToken
+    botId.value = urlToken.startsWith('session-') ? urlToken.slice(8) : urlToken
+    localStorage.setItem('token', urlToken)
+    localStorage.setItem('bot_id', botId.value)
+    // Clean URL
+    const cleanUrl = window.location.pathname
+    window.history.replaceState({}, '', cleanUrl)
+  }
+
   const user = computed(() => ({
     username: botId.value,
     bot_id: botId.value,
