@@ -91,6 +91,10 @@ import AddFriendDialog from './AddFriendDialog.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+const displayUserId = computed(() => {
+  const uid = localStorage.getItem("user_id")
+  return uid || auth.userId || auth.user?.user_id || ""
+})
 const chat = useChatStore()
 const search = ref('')
 const tab = ref('msg')
