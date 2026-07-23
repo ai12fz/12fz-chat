@@ -54,6 +54,7 @@
             <option value="claude-sonnet-4">Claude Sonnet 4</option>
             <option value="deepseek-v3">DeepSeek V3</option>
             <option value="qwen-max">Qwen Max</option>
+            <option value="tk.12fz.com">tk.12fz.com (中转)</option>
           </select>
         </div>
         <div class="form-group">
