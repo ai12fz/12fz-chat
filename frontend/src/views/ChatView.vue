@@ -43,13 +43,7 @@ onMounted(async () => {
 
     // Load unread counts
     try {
-      const unreads = await getUnreadCounts()
-      for (const [groupIdStr, count] of Object.entries(unreads)) {
-        const sid = chat.groupSessionId(Number(groupIdStr))
-        const s = chat.sessions.find(s => s.id === sid)
-        if (s) s.unread = count as number
-      }
-    } catch { /* unread endpoint may not have data */ }
+  
 
     // Load messages for all groups immediately
     for (const g of groups) {
