@@ -89,7 +89,7 @@ func (h *HTTPHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	botID := getBotID(r)
-	group, err := h.db.CreateGroup(r.Context(), req.Name, botID)
+	group, err := h.db.CreateGroup(r.Context(), req.Name, func() int64 { id, _ := strconv.ParseInt(botID, 10, 64); return id }())
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -243,7 +243,7 @@ func (h *HTTPHandler) broadcastMessage(m *db.MessageResult) {
 
 	var botIDs []string
 	for _, member := range members {
-		botIDs = append(botIDs, member.BotID)
+		botIDs = append(botIDs, strconv.FormatInt(member.UserID, 10))
 	}
 	h.hub.SendToGroup(m.GroupID, data, botIDs)
 }
@@ -312,9 +312,34 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 	botID := getBotID(r)
-	jsonResp(w, map[string]string{
-		"bot_id": botID,
-		"username": botID,
+	id, _ := strconv.ParseInt(botID, 10, 64)
+	log.Printf("[whoami] botID=%s id=%d", botID, id)
+	orgUser, err := h.db.GetOrgUserByID(r.Context(), id)
+	log.Printf("[whoami] err=%v user=%+v", err, orgUser)
+	if err == nil {
+		jsonResp(w, map[string]interface{}{"user_id": orgUser.UserID, "nickname": orgUser.Nickname, "phone": orgUser.Phone}, 200)
+		return
+	}
+	jsonResp(w, map[string]interface{}{"user_id": 0, "nickname": botID}, 200)
+}
+
+
+func (h *HTTPHandler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user id", 400)
+		return
+	}
+	orgUser, err := h.db.GetOrgUserByID(r.Context(), userID)
+	if err != nil {
+		jsonError(w, "user not found", 404)
+		return
+	}
+	jsonResp(w, map[string]interface{}{
+		"user_id":  orgUser.UserID,
+		"nickname": orgUser.Nickname,
+		"phone":    orgUser.Phone,
 	}, 200)
 }
 

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strconv"
 	"context"
 	"encoding/json"
 	"log"
@@ -32,7 +33,7 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 
 	m := &model.Message{
 		GroupID:  msg.GroupID,
-		SenderID: senderID,
+		SenderID: func() int64 { v, _ := strconv.ParseInt(senderID, 10, 64); return v }(),
 		Content:  msg.Content,
 		MsgType:  "text",
 	}
@@ -61,7 +62,7 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 	chatMsg := ws.ChatMessage{
 		ID:       m.ID,
 		GroupID:  m.GroupID,
-		SenderID: m.SenderID,
+		SenderID: strconv.FormatInt(m.SenderID, 10),
 		Content:  m.Content,
 		MsgType:  m.MsgType,
 		SendAt:   m.CreatedAt,
@@ -75,7 +76,7 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 
 	var botIDs []string
 	for _, member := range members {
-		botIDs = append(botIDs, member.BotID)
+		botIDs = append(botIDs, strconv.FormatInt(member.UserID, 10))
 	}
 	h.hub.SendToGroup(m.GroupID, broadcastData, botIDs)
 }

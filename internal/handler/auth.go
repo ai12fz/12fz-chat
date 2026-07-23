@@ -18,16 +18,14 @@ type AuthHandler struct {
 	adminID   string
 	adminPass string
 	botTokens map[string]string // bot_id -> pre-shared token
-	userMap   map[string]string // numeric_id -> username
 }
 
-func NewAuthHandler(jwtSecret, adminID, adminPass string, botTokens, userMap map[string]string) *AuthHandler {
+func NewAuthHandler(jwtSecret, adminID, adminPass string, botTokens map[string]string) *AuthHandler {
 	return &AuthHandler{
 		jwtSecret: jwtSecret,
 		adminID:   adminID,
 		adminPass: adminPass,
 		botTokens: botTokens,
-		userMap:   userMap,
 	}
 }
 
@@ -90,11 +88,7 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 
 	// Support session tokens: session-{userID}
 	if strings.HasPrefix(token, "session-") {
-		id := token[8:]
-		if name, ok := h.userMap[id]; ok {
-			return name, nil
-		}
-		return id, nil
+		return token[8:], nil
 	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {

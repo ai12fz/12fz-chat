@@ -12,6 +12,7 @@ import (
 
 type DB struct {
 	pool *pgxpool.Pool
+	zhongtaiPool *pgxpool.Pool
 }
 
 func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
@@ -28,12 +29,56 @@ func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
 	return &DB{pool: pool}, nil
 }
 
+func ConnectBoth(chatDSN, ztDSN string) (*DB, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, chatDSN)
+	if err != nil { return nil, fmt.Errorf("chat db: %w", err) }
+	if err := pool.Ping(ctx); err != nil { return nil, fmt.Errorf("chat ping: %w", err) }
+
+	ztPool, err := pgxpool.New(ctx, ztDSN)
+	if err != nil { pool.Close(); return nil, fmt.Errorf("zt db: %w", err) }
+	if err := ztPool.Ping(ctx); err != nil { pool.Close(); ztPool.Close(); return nil, fmt.Errorf("zt ping: %w", err) }
+
+	return &DB{pool: pool, zhongtaiPool: ztPool}, nil
+}
+
+
+
 func NewFromPool(pool *pgxpool.Pool) *DB {
 	return &DB{pool: pool}
 }
 
 func (d *DB) Close() {
 	d.pool.Close()
+}
+
+
+type OrgUser struct {
+	UserID   int64  `json:"user_id"`
+	Nickname string `json:"nickname"`
+	Phone    string `json:"phone"`
+	Email    string `json:"email"`
+	Status   string `json:"status"`
+}
+
+func (d *DB) GetOrgUserByID(ctx context.Context, userID int64) (*OrgUser, error) {
+	var u OrgUser
+	err := d.zhongtaiPool.QueryRow(ctx,
+		"SELECT user_id, nickname, phone, email, status FROM org_user WHERE user_id = $1",
+		userID,
+	).Scan(&u.UserID, &u.Nickname, &u.Phone, &u.Email, &u.Status)
+	return &u, err
+}
+
+func (d *DB) GetOrgUserForLogin(ctx context.Context, account, password string) (*OrgUser, error) {
+	var u OrgUser
+	err := d.zhongtaiPool.QueryRow(ctx,
+		"SELECT user_id, nickname FROM org_user WHERE (nickname = $1 OR phone = $1) AND password = $2",
+		account, password,
+	).Scan(&u.UserID, &u.Nickname)
+	return &u, err
 }
 
 func (d *DB) AutoMigrate(ctx context.Context) error {
@@ -151,7 +196,7 @@ type GroupWithMeta struct {
 	Unread        int       `json:"unread"`
 }
 
-func (d *DB) CreateGroup(ctx context.Context, name, createdBy string) (*model.Group, error) {
+func (d *DB) CreateGroup(ctx context.Context, name string, createdBy int64) (*model.Group, error) {
 	g := &model.Group{Name: name, CreatedBy: createdBy}
 	err := d.pool.QueryRow(ctx,
 		"INSERT INTO chat.groups (name, created_by) VALUES ($1, $2) RETURNING id, created_at",
@@ -221,7 +266,7 @@ func (d *DB) GetMembers(ctx context.Context, groupID int64) ([]model.GroupMember
 	var members []model.GroupMember
 	for rows.Next() {
 		var m model.GroupMember
-		if err := rows.Scan(&m.GroupID, &m.BotID, &m.Role, &m.JoinedAt); err != nil {
+		if err := rows.Scan(&m.GroupID, &m.UserID, &m.Role, &m.JoinedAt); err != nil {
 			return nil, err
 		}
 		members = append(members, m)

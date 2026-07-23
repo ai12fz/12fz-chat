@@ -22,7 +22,7 @@ func main() {
 	log.Printf("[chat] starting 12fz-chat on :%d", cfg.Port)
 
 	// Connect DB
-	database, err := db.Connect(cfg)
+	database, err := db.ConnectBoth(cfg.PGConnStr, cfg.ZhongTaiDSN)
 	if err != nil {
 		log.Fatalf("[chat] db connect: %v", err)
 	}
@@ -39,7 +39,7 @@ func main() {
 	hub := ws.NewHub()
 
 	// Init auth handler
-	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass, cfg.BotTokens, cfg.UserMap)
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass, cfg.BotTokens)
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
@@ -80,6 +80,10 @@ func main() {
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 	api.HandleFunc("/agent-status", httpHandler.GetAgentStatus).Methods("GET")
 
+	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
+	api.HandleFunc("/users/{id}", httpHandler.GetUserInfo).Methods("GET")
+	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
+	api.HandleFunc("/users/{id}", httpHandler.GetUserInfo).Methods("GET")
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
 	api.HandleFunc("/friends/action", httpHandler.HandleFriendRequest).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.SendFriendMessage).Methods("POST")
