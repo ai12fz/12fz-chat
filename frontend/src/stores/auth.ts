@@ -29,8 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
     expire.value = 0
     localStorage.removeItem('token')
     localStorage.removeItem('bot_id')
-    localStorage.removeItem('expire')
+    merchantId.value = ''; localStorage.removeItem('merchant_id'); localStorage.removeItem('expire')
   }
 
-  return { token, botId, expire, user, login, logout }
+  return { token, botId, expire, merchantId, user, login, logout }
 })

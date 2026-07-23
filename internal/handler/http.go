@@ -415,7 +415,8 @@ func (h *HTTPHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
 // ── Agent CRUD ──
 
 func (h *HTTPHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agents, err := h.db.ListAgents(r.Context())
+	mid := r.Header.Get("X-Merchant-ID")
+	agents, err := h.db.ListAgents(r.Context(), mid)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -446,6 +447,9 @@ func (h *HTTPHandler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	if a.Status == "" {
 		a.Status = "active"
+	}
+	if a.MerchantID == "" {
+		a.MerchantID = r.Header.Get("X-Merchant-ID")
 	}
 	if a.Model == "" {
 		a.Model = "gpt-4"
