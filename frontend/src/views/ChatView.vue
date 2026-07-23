@@ -61,6 +61,8 @@ onMounted(async () => {
           const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
           if (idx >= 0) {
             chat.sessions[idx].messages = sessionMsgs
+            chat.sessions[idx].unread = 0
+            chat.sessions[idx].unread = 0
           }
         }
       } catch(e) { console.error("load error:", e) }
