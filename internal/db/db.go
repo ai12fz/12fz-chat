@@ -95,11 +95,11 @@ func (d *DB) AutoMigrate(ctx context.Context) error {
 
 		"CREATE TABLE IF NOT EXISTS chat.group_members (" +
 			"group_id INT REFERENCES chat.groups(id) ON DELETE CASCADE," +
-			"bot_id TEXT NOT NULL," +
+			"user_id BIGINT NOT NULL," +
 			"role TEXT DEFAULT 'member'," +
 			"joined_at TIMESTAMPTZ DEFAULT NOW()," +
 			"last_read_msg_id INT DEFAULT 0," +
-			"PRIMARY KEY (group_id, bot_id)" +
+			"PRIMARY KEY (group_id, user_id)" +
 			")",
 
 		"CREATE TABLE IF NOT EXISTS chat.messages (" +
@@ -231,7 +231,7 @@ func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMe
 		       (SELECT COUNT(*) FROM chat.messages WHERE group_id = g.id AND id > COALESCE(m.last_read_msg_id, 0)) as unread
 		 FROM chat.groups g
 		 JOIN chat.group_members m ON m.group_id = g.id
-		 WHERE m.bot_id = $1
+		 WHERE m.user_id = $1
 		 ORDER BY g.last_msg_at DESC`, botID)
 	if err != nil {
 		return nil, err
@@ -250,14 +250,14 @@ func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMe
 
 func (d *DB) AddMember(ctx context.Context, groupID int64, botID, role string) error {
 	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.group_members (group_id, bot_id, role) VALUES ($1, $2, $3) ON CONFLICT (group_id, bot_id) DO UPDATE SET role = $3",
+		"INSERT INTO chat.group_members (group_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (group_id, user_id) DO UPDATE SET role = $3",
 		groupID, botID, role)
 	return err
 }
 
 func (d *DB) GetMembers(ctx context.Context, groupID int64) ([]model.GroupMember, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT group_id, bot_id, role, joined_at FROM chat.group_members WHERE group_id = $1",
+		"SELECT group_id, user_id, role, joined_at FROM chat.group_members WHERE group_id = $1",
 		groupID)
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func (d *DB) UpdateGroupLastMsg(ctx context.Context, groupID int64) error {
 // UpdateLastRead updates the last_read_msg_id for a member in a group
 func (d *DB) UpdateLastRead(ctx context.Context, groupID int64, botID string, msgID int64) error {
 	_, err := d.pool.Exec(ctx,
-		"UPDATE chat.group_members SET last_read_msg_id = $1 WHERE group_id = $2 AND bot_id = $3",
+		"UPDATE chat.group_members SET last_read_msg_id = $1 WHERE group_id = $2 AND user_id = $3",
 		msgID, groupID, botID)
 	return err
 }
@@ -300,7 +300,7 @@ func (d *DB) GetUnreadCount(ctx context.Context, groupID int64, botID string) (i
 		`SELECT COALESCE(COUNT(*), 0) FROM chat.messages m
 		 WHERE m.group_id = $1 AND m.id > (
 		   SELECT COALESCE(gm.last_read_msg_id, 0) FROM chat.group_members gm
-		   WHERE gm.group_id = $1 AND gm.bot_id = $2
+		   WHERE gm.group_id = $1 AND gm.user_id = $2
 		 )`,
 		groupID, botID).Scan(&count)
 	return count, err
@@ -311,7 +311,7 @@ func (d *DB) GetUnreadCountForUser(ctx context.Context, botID string) (map[int64
 	rows, err := d.pool.Query(ctx,
 		`SELECT m.group_id, COUNT(*) AS unread
 		 FROM chat.messages m
-		 JOIN chat.group_members gm ON gm.group_id = m.group_id AND gm.bot_id = $1
+		 JOIN chat.group_members gm ON gm.group_id = m.group_id AND gm.user_id = $1
 		 WHERE m.id > COALESCE(gm.last_read_msg_id, 0)
 		 GROUP BY m.group_id`, botID)
 	if err != nil {
