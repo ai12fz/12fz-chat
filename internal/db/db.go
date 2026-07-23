@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ai12fz/12fz-chat/internal/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -365,4 +366,37 @@ func (d *DB) DeleteFriend(ctx context.Context, userID, friendID string) error {
 		"DELETE FROM chat.friends WHERE user_id=$1 AND friend_id=$2",
 		userID, friendID)
 	return err
+}
+
+
+// GetBotStatus returns the current status of a bot/agent
+func (d *DB) GetBotStatus(ctx context.Context, botID string) (map[string]interface{}, error) {
+	sql := `SELECT bot_id, status, COALESCE(current_task_id, ''), COALESCE(current_task_title, ''), COALESCE(message, ''), heartbeat_at, updated_at FROM chat.bot_statuses WHERE bot_id=$1`
+	row := d.pool.QueryRow(ctx, sql, botID)
+	var id, status, taskID, taskTitle, msg string
+	var heartbeat, updated time.Time
+	err := row.Scan(&id, &status, &taskID, &taskTitle, &msg, &heartbeat, &updated)
+	if err == pgx.ErrNoRows {
+		return map[string]interface{}{
+			"bot_id": botID,
+			"status": "offline",
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]interface{}{
+		"bot_id":             id,
+		"status":             status,
+		"heartbeat_at":       heartbeat.Format(time.RFC3339),
+		"updated_at":         updated.Format(time.RFC3339),
+	}
+	if taskID != "" {
+		result["current_task_id"] = taskID
+		result["current_task_title"] = taskTitle
+	}
+	if msg != "" {
+		result["message"] = msg
+	}
+	return result, nil
 }

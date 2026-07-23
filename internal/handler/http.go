@@ -389,3 +389,26 @@ func (h *HTTPHandler) HandleFriendRequest(w http.ResponseWriter, r *http.Request
 func (h *HTTPHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]int{"count": h.hub.ConnectionCount()}, 200)
 }
+
+// GetAgentStatus returns agent/bot current status
+func (h *HTTPHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
+	botID := r.URL.Query().Get("bot_id")
+	if botID == "" {
+		w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]string{"error": "bot_id required"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	status, err := h.db.GetBotStatus(ctx, botID)
+	if err != nil {
+		log.Printf("[http] get agent status error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(map[string]string{"error": "internal"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
