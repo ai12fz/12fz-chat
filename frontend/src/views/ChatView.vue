@@ -52,7 +52,26 @@ onMounted(async () => {
     } catch { /* unread endpoint may not have data */ }
 
     // Select first session
-    if (firstId) chat.setActive(firstId)
+    if (firstId) {
+      chat.setActive(firstId)
+      // Preload messages for first group
+      const gmatch = firstId.match(/^group:(\d+)$/)
+      if (gmatch) {
+        try {
+          const resp = await fetch("/api/messages?group_id=" + gmatch[1] + "&limit=50", {
+            headers: { Authorization: "Bearer " + auth.token }
+          })
+          if (resp.ok) {
+            const msgs = await resp.json()
+            if (msgs && msgs.length > 0) {
+              msgs.reverse()
+              const s = chat.sessions.find(function(x){ return x.id === firstId })
+              if (s) { s.messages = msgs; s.unread = 0 }
+            }
+          }
+        } catch(e) { console.error("preload error:", e) }
+      }
+    }
   } catch (err) {
     console.error('Failed to load chat data:', err)
   }

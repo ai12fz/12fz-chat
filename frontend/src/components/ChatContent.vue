@@ -210,7 +210,7 @@ watch(() => chat.activeId, async () => { console.log("[chat] loading messages fo
         if (msgs && msgs.length > 0) {
           msgs.reverse()
           const s = chat.sessions.find(function(x){ return x.id === sid })
-          if (s) { s.messages = msgs; s.unread = 0 }
+          console.log("[chat] loaded", msgs.length, "msgs from group", gmatch[1]); if (s) { s.messages = msgs; s.unread = 0 }
         }
       }
     } catch(e) { console.error("Failed to load group messages:", e) }
