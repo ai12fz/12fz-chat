@@ -6,6 +6,7 @@
         <span class="name">{{ displayName }}</span>
       </div>
       <button class="logout-btn" @click="handleLogout" title="退出登录">退出</button>
+      <button class="admin-btn" @click="$router.push('/admin/agents')" title="Agent管理">⚙ 管理</button>
     </div>
 
     <!-- Tab 切换 -->
