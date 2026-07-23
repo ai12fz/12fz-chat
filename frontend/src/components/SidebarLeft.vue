@@ -67,8 +67,8 @@
         <div class="profile-avatar" :style="{ background: avatarColor({name: displayName}) }">{{ displayName[0] }}</div>
         <h3>{{ displayName }}</h3>
         <div class="profile-form">
+          <span class="user-id-tag">ID: {{ auth.userId || auth.user?.user_id || '—' }}</span>
           <label>昵称</label>
-        <span class="user-id-tag">ID: {{ auth.userId || auth.user?.user_id || '—' }}</span>
           <input v-model="profileName" placeholder="输入新名称" />
           <button class="save-btn" @click="saveProfile">保存</button>
           <p v-if="profileMsg" class="profile-msg">{{ profileMsg }}</p>
