@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    <AddFriendDialog v-if="showAddFriend" @close="showAddFriend = false; loadFriends()" />
+    <AddFriendDialog :visible="showAddFriend" @close="showAddFriend = false; loadFriends()" />
   </aside>
 </template>
 
@@ -128,7 +128,7 @@ function openFriendChat(friendId: string, displayName: string) {
   const sid = 'friend:' + friendId
   let session = chat.sessions.find((s: any) => s.id === sid)
   if (!session) {
-    session = { id: sid, name: displayName, type: 'friend', messages: [], members: [] }
+    session = { id: sid, name: displayName, type: 'friend', messages: [], members: [], lastMsgAt: new Date().toISOString() }
     chat.sessions.push(session)
   }
   chat.activeId = sid

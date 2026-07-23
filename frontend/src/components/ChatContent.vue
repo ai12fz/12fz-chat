@@ -123,6 +123,7 @@ function handleSend() {
   if (fmatch) {
     ws.sendMessage(fmatch[1], content)
     sendFriendMessage(fmatch[1], content).catch(function(){})
+    if (session.value) session.value.lastMsgAt = new Date().toISOString()
   }
   text.value = ''
   showEmoji.value = false
