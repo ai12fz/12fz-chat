@@ -185,7 +185,28 @@ watch(() => chat.activeId, async () => {
     msgListRef.value.scrollTop = msgListRef.value.scrollHeight
   }
   const sid = chat.activeId
-  if (sid && sid.startsWith("friend:")) {
+  if (!sid) return
+  // Load group messages
+  const gmatch = sid.match(/^group:(\d+)$/)
+  if (gmatch) {
+    try {
+      const tok = localStorage.getItem("token") || ""
+      const resp = await fetch("/api/messages?group_id=" + gmatch[1] + "&limit=50", {
+        headers: { Authorization: "Bearer " + tok }
+      })
+      if (resp.ok) {
+        const msgs = await resp.json()
+        if (msgs && msgs.length > 0) {
+          msgs.reverse()
+          const s = chat.sessions.find(function(x){ return x.id === sid })
+          if (s) s.messages = msgs
+        }
+      }
+    } catch(e) { console.error("Failed to load group messages:", e) }
+    return
+  }
+  // Load friend messages
+  if (sid.startsWith("friend:")) {
     const fid = sid.replace("friend:", "")
     const tok = localStorage.getItem("token") || ""
     const myId = tok.startsWith("session-") ? tok.slice(8) : tok
