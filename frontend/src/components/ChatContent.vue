@@ -1,6 +1,5 @@
 <template>
   <main class="chat-content">
-    <div style="position:fixed;top:0;right:0;background:#ff0;padding:2px 8px;z-index:9999;font-size:11px">{{ debugInfo }}</div>
   <template v-if="session">
       <!-- Header -->
       <div class="chat-header">
@@ -94,11 +93,6 @@ const fileInputRef = ref<HTMLInputElement>()
 
 const session = computed(() => chat.activeSession)
   // DEBUG
-  const debugInfo = ref("loading...")
-  watch(() => chat.activeSession, (s) => {
-    if (s) debugInfo.value = s.id + " msgs:" + s.messages.length + " unread:" + s.unread
-    else debugInfo.value = "no session"
-  }, { immediate: true })
 
 const emojis = ['😊', '😂', '🤣', '❤️', '👍', '😍', '🥰', '😘', '😜', '😎',
   '🤔', '🙄', '😏', '😴', '🥱', '😭', '😤', '😡', '🤬', '👋',
