@@ -56,7 +56,6 @@ onMounted(async () => {
           if (idx >= 0) {
             chat.sessions[idx].messages = sessionMsgs
             chat.sessions[idx].unread = 0
-            chat.sessions[idx].unread = 0
           }
         }
       } catch(e) { console.error("load error:", e) }
