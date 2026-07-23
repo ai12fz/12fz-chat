@@ -22,7 +22,7 @@ func main() {
 	log.Printf("[chat] starting 12fz-chat on :%d", cfg.Port)
 
 	// Connect DB
-	database, err := db.ConnectBoth(cfg.PGConnStr, cfg.ZhongTaiDSN)
+	database, err := db.ConnectBoth(cfg.PGConnStr, cfg.PlatformDSN)
 	if err != nil {
 		log.Fatalf("[chat] db connect: %v", err)
 	}

@@ -12,7 +12,7 @@ import (
 
 type DB struct {
 	pool *pgxpool.Pool
-	zhongtaiPool *pgxpool.Pool
+	platformPool *pgxpool.Pool
 }
 
 func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
@@ -29,7 +29,7 @@ func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
 	return &DB{pool: pool}, nil
 }
 
-func ConnectBoth(chatDSN, ztDSN string) (*DB, error) {
+func ConnectBoth(chatDSN, platformDSN string) (*DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -37,11 +37,11 @@ func ConnectBoth(chatDSN, ztDSN string) (*DB, error) {
 	if err != nil { return nil, fmt.Errorf("chat db: %w", err) }
 	if err := pool.Ping(ctx); err != nil { return nil, fmt.Errorf("chat ping: %w", err) }
 
-	ztPool, err := pgxpool.New(ctx, ztDSN)
+	platformPool, err := pgxpool.New(ctx, platformDSN)
 	if err != nil { pool.Close(); return nil, fmt.Errorf("zt db: %w", err) }
-	if err := ztPool.Ping(ctx); err != nil { pool.Close(); ztPool.Close(); return nil, fmt.Errorf("zt ping: %w", err) }
+	if err := platformPool.Ping(ctx); err != nil { pool.Close(); platformPool.Close(); return nil, fmt.Errorf("zt ping: %w", err) }
 
-	return &DB{pool: pool, zhongtaiPool: ztPool}, nil
+	return &DB{pool: pool, platformPool: platformPool}, nil
 }
 
 
@@ -65,8 +65,8 @@ type OrgUser struct {
 
 func (d *DB) GetOrgUserByID(ctx context.Context, userID int64) (*OrgUser, error) {
 	var u OrgUser
-	err := d.zhongtaiPool.QueryRow(ctx,
-		"SELECT user_id, nickname, phone, email, status FROM org_user WHERE user_id = $1",
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT user_id, nickname, phone, COALESCE(email, ''), status FROM org_user WHERE user_id = $1",
 		userID,
 	).Scan(&u.UserID, &u.Nickname, &u.Phone, &u.Email, &u.Status)
 	return &u, err
@@ -74,8 +74,8 @@ func (d *DB) GetOrgUserByID(ctx context.Context, userID int64) (*OrgUser, error)
 
 func (d *DB) GetOrgUserForLogin(ctx context.Context, account, password string) (*OrgUser, error) {
 	var u OrgUser
-	err := d.zhongtaiPool.QueryRow(ctx,
-		"SELECT user_id, nickname FROM org_user WHERE (nickname = $1 OR phone = $1) AND password = $2",
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT user_id, COALESCE(nickname, '') FROM org_user WHERE (nickname = $1 OR phone = $1) AND password = $2",
 		account, password,
 	).Scan(&u.UserID, &u.Nickname)
 	return &u, err
