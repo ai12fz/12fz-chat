@@ -185,7 +185,7 @@ async function markRead(groupId: number, msgId: number) {
     await fetch("/api/messages/read", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-      body: JSON.stringify({ group_id: groupId, msg_id: msgId })
+      body: JSON.stringify({ group_id: groupId, last_read_msg_id: msgId })
     })
   } catch(e) {}
 }
