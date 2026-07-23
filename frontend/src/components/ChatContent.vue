@@ -79,7 +79,7 @@
 import { ref, watch, nextTick, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
-import { getFriendMessages, sendFriendMessage } from "../api"
+import { getFriendMessages, sendFriendMessage, getMessages, sendMessage } from "../api"
 import { useWebSocket } from '../composables/useWebSocket'
 
 const auth = useAuthStore()
@@ -208,18 +208,13 @@ watch(() => chat.activeId, async () => {
   const gmatch = sid.match(/^group:(\d+)$/)
   if (gmatch) {
     try {
-      const resp = await fetch("/api/messages?group_id=" + gmatch[1] + "&limit=50", {
-        headers: { Authorization: "Bearer " + tok }
-      })
-      if (resp.ok) {
-        const msgs = await resp.json()
-        if (msgs && msgs.length > 0) {
-          msgs.reverse()
-          const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
-          if (idx >= 0) {
-            chat.sessions[idx].messages = msgs
-            chat.sessions[idx].unread = 0
-          }
+      const msgs = await getMessages(parseInt(gmatch[1]), 50, 0)
+      if (msgs && msgs.length > 0) {
+        msgs.reverse()
+        const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+        if (idx >= 0) {
+          chat.sessions[idx].messages = msgs
+          chat.sessions[idx].unread = 0
         }
       }
     } catch(e) {}
