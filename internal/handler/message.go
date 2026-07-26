@@ -33,7 +33,7 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 
 	m := &model.Message{
 		GroupID:  msg.GroupID,
-		SenderID: func() int64 { v, _ := strconv.ParseInt(senderID, 10, 64); return v }(),
+		SenderID: senderID,
 		Content:  msg.Content,
 		MsgType:  "text",
 	}
@@ -62,7 +62,7 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 	chatMsg := ws.ChatMessage{
 		ID:       m.ID,
 		GroupID:  m.GroupID,
-		SenderID: strconv.FormatInt(m.SenderID, 10),
+		SenderID: m.SenderID,
 		Content:  m.Content,
 		MsgType:  m.MsgType,
 		SendAt:   m.CreatedAt,

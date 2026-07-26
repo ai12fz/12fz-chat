@@ -103,13 +103,20 @@ const displayName = computed(() => auth.user?.nickname || auth.user?.username ||
 const userId = computed(() => localStorage.getItem('user_id') || auth.user?.user_id || '')
 
 const sortedSessions = computed(() => {
-  return [...chat.sessions].sort(function(a,b){
-    var at = a.lastMsgAt || ''
-    var bt = b.lastMsgAt || ''
-    if (at > bt) return -1
-    if (at < bt) return 1
-    return 0
-  })
+  return [...chat.sessions]
+    .filter(function(s: any) {
+      // Only show sessions that have messages or have been explicitly opened
+      var hasContent = s.messages && s.messages.length > 0
+      var hasLastMsg = s.lastMsgAt && s.lastMsgAt !== ''
+      return hasContent || hasLastMsg
+    })
+    .sort(function(a,b){
+      var at = a.lastMsgAt || ''
+      var bt = b.lastMsgAt || ''
+      if (at > bt) return -1
+      if (at < bt) return 1
+      return 0
+    })
 })
 
 const filteredSessions = computed(() => {
