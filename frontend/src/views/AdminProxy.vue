@@ -134,7 +134,7 @@ const keyOrgId = ref('00000000-0000-0000-0000-000000000000')
 const keyName = ref('')
 
 async function call(url: string, opts: any = {}) {
-  return (await fetch('/api' + url, { headers: { 'Content-Type': 'application/json', Authorization: localStorage.getItem('token') || '' }, ...opts })).json()
+  return (await fetch(url, { headers: { 'Content-Type': 'application/json', Authorization: localStorage.getItem('token') || '' }, ...opts })).json()
 }
 
 watch(tab, async t => {

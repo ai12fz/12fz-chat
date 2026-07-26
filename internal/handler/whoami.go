@@ -32,7 +32,6 @@ func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// go.12fz.com returns: {code:0, data:{userInfo:{nickName, user_id, username, org_id}, menus:[...]}, msg:"success"}
 	var upstream struct {
 		Code int `json:"code"`
 		Data struct {
@@ -55,11 +54,10 @@ func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 		nick = upstream.Data.UserInfo.Username
 	}
 
-	result := map[string]interface{}{
+	jsonResp(w, map[string]interface{}{
 		"user_id":  uid,
 		"nickname": nick,
 		"username": upstream.Data.UserInfo.Username,
 		"org_id":   upstream.Data.UserInfo.OrgID,
-	}
-	jsonResp(w, result, 200)
+	}, 200)
 }

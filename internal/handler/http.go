@@ -308,20 +308,6 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, friends, 200)
 }
 
-// ── WhoAmI ──
-
-func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
-	botID := getBotID(r)
-	id, _ := strconv.ParseInt(botID, 10, 64)
-	log.Printf("[whoami] botID=%s id=%d", botID, id)
-	orgUser, err := h.db.GetOrgUserByID(r.Context(), id)
-	log.Printf("[whoami] err=%v user=%+v", err, orgUser)
-	if err == nil {
-		jsonResp(w, map[string]interface{}{"user_id": orgUser.UserID, "nickname": orgUser.Nickname, "phone": orgUser.Phone}, 200)
-		return
-	}
-	jsonResp(w, map[string]interface{}{"user_id": 0, "nickname": botID}, 200)
-}
 
 
 func (h *HTTPHandler) GetUserInfo(w http.ResponseWriter, r *http.Request) {

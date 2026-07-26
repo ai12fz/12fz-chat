@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	PlatformDSN string
 	Port      int
 	PGConnStr string
 	JWTSecret string
@@ -27,6 +28,7 @@ func Load() *Config {
 	}
 	return &Config{
 		Port:      getEnvInt("PORT", 8081),
+		PlatformDSN: getEnv("PLATFORM_DSN", getEnv("PG_CONN", "postgresql://app_zhongtai:@localhost:5432/12fzsj?sslmode=disable")),
 		PGConnStr: getEnv("PG_CONN", "postgresql://app_zhongtai:@localhost:5432/12fzsj?sslmode=disable"),
 		JWTSecret: getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
 		BotTokens: bt,
