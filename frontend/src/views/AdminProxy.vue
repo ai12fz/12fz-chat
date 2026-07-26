@@ -24,7 +24,7 @@
       <div class="chart-box" v-if="chartDates.length">
         <h4>近30天 Token 消耗（按模型）</h4>
         <div class="chart-wrap" style="position:relative">
-          <div class="ref-line" :style="{ bottom: refLineY + 'px' }">{{ Math.round(refValue/1000) }}k</div>
+          
           <div class="bar-chart">
             <div class="bar-col" v-for="d in chartDates" :key="d">
               <div class="bar-stack">
@@ -33,6 +33,7 @@
                   :title="seg.model+': '+seg.tokens+' tk'"></div>
               </div>
               <span class="bar-label">{{ d.slice(5) }}</span>
+              <span v-if="d === chartDates[chartDates.length-1]" class="bar-ruler" :style="{ bottom: rulerY + 'px' }">{{ rulerLabel }}</span>
             </div>
           </div>
         </div>
@@ -147,6 +148,8 @@ const chartMap = ref<Record<string,any[]>>({})
 const chartMax = ref(1)
 const refValue = ref(0)
 const refLineY = ref(40)
+const rulerY = ref(0)
+const rulerLabel = ref("0")
 const MODEL_COLORS = ["#1890ff","#52c41a","#fa8c16","#eb2f96","#722ed1","#13c2c2","#f5222d","#faad14"]
 const models = ref<any[]>([])
 const pricing = ref<any[]>([])
@@ -195,6 +198,13 @@ watch(tab, async t => {
   const totals = chartDates.value.map(d => Object.values(dateMap[d]).reduce((s,v)=>s+v,0))
   refValue.value = totals.length ? totals.reduce((s,v)=>s+v,0) / totals.length : 0
   refLineY.value = 34 + (refValue.value / chartMax.value) * 140
+  // Ruler: show total tokens on last bar
+  const lastDate = chartDates.value[chartDates.value.length-1]
+  if (lastDate && chartMap.value[lastDate]) {
+    const lastTotal = chartMap.value[lastDate].reduce((s:number, x:any) => s + x.tokens, 0)
+    rulerLabel.value = lastTotal >= 1000 ? (lastTotal/1000).toFixed(1)+'k' : String(lastTotal)
+    rulerY.value = 34 + (lastTotal / chartMax.value) * 140
+  }
 }
   if (t === 'models') models.value = await call('/admin/proxy/models')
   if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
@@ -246,6 +256,7 @@ th { background: #fafafa; font-weight: 500; }
 .bar-stack { width: 100%; max-width: 14px; display: flex; flex-direction: column-reverse; }
 .bar-seg { width: 100%; border-radius: 1px; transition: opacity .2s; }
 .bar-seg:hover { opacity: 0.7; }
+.bar-ruler { position: absolute; right: -8px; font-size: 10px; color: #f5222d; font-weight: 600; white-space: nowrap; pointer-events: none; }
 .bar-label { font-size: 8px; color: #999; margin-top: 4px; transform: rotate(-60deg); white-space: nowrap; transform-origin: top left; }
 .card { padding: 20px; font-size: 24px; font-weight: 600; line-height: 1.6; background: #fff; border-radius: 8px; flex: 1; min-width: 200px; }
 .form-group { margin-bottom: 12px; }
