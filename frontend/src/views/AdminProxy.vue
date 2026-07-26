@@ -17,6 +17,16 @@
       <div class="cards">
         <div class="card" v-for="(v, k) in stats" :key="k">{{ k }}: {{ v.calls }}次 | {{ v.tokens }}tk | ¥{{ (v.cost||0).toFixed(4) }}</div>
       </div>
+      <div class="chart-box" v-if="dailyData.length">
+        <h4>近30天调用量</h4>
+        <div class="bar-chart">
+          <div class="bar-col" v-for="d in dailyData" :key="d.date">
+            <div class="bar" :style="{ height: barHeight(d.calls) }"></div>
+            <span class="bar-label">{{ d.date.slice(5) }}</span>
+            <span class="bar-val">{{ d.calls }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Models -->
@@ -121,6 +131,7 @@ const tabs = [{id:'dashboard',name:'看板'},{id:'models',name:'模型管理'},{
 const tab = ref('dashboard')
 
 const stats = ref<any>({})
+const dailyData = ref<any[]>([])
 const models = ref<any[]>([])
 const pricing = ref<any[]>([])
 const multiplier = ref(2)
@@ -138,7 +149,7 @@ async function call(url: string, opts: any = {}) {
 }
 
 watch(tab, async t => {
-  if (t === 'dashboard') { const d = await call('/admin/proxy/dashboard'); stats.value = { '今日': d.today, '本月': d.month } }
+  if (t === 'dashboard') { const d = await call('/admin/proxy/dashboard'); stats.value = { '今日': d.today, '本月': d.month }; dailyData.value = d.daily || [] }
   if (t === 'models') models.value = await call('/admin/proxy/models')
   if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
   if (t === 'merchants') merchants.value = await call('/admin/proxy/merchants')
@@ -159,6 +170,7 @@ async function recharge(m: any) { const amount = prompt('充值金额(元)'); if
 async function showLedger(m: any) { ledger.value = await call('/admin/proxy/merchants/' + m.org_id + '/ledger') }
 async function createKey() { const r = await call('/admin/proxy/keys', { method: 'POST', body: JSON.stringify({ org_id: keyOrgId.value, name: keyName.value }) }); alert('Key: ' + (r as any).key_text); keys.value = await call('/admin/proxy/keys?org_id=' + keyOrgId.value) }
 async function revokeKey(k: any) { await call('/admin/proxy/keys/' + k.id + '/revoke', { method: 'POST' }); keys.value = await call('/admin/proxy/keys?org_id=' + k.org_id) }
+function barHeight(v: number) { const max = Math.max(...dailyData.value.map((d:any)=>d.calls), 1); return (v/max*150)+'px' }
 </script>
 
 <style scoped>
@@ -174,6 +186,13 @@ table { width: 100%; border-collapse: collapse; background: #fff; border-radius:
 th, td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-align: left; font-size: 13px; }
 th { background: #fafafa; font-weight: 500; }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.chart-box { margin-top: 24px; background: #fff; border-radius: 8px; padding: 20px; }
+.chart-box h4 { margin: 0 0 16px; font-size: 14px; color: #666; }
+.bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 200px; padding-bottom: 24px; border-bottom: 1px solid #eee; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.bar { width: 100%; max-width: 20px; background: #1890ff; border-radius: 2px 2px 0 0; min-height: 2px; }
+.bar-label { font-size: 9px; color: #999; margin-top: 4px; transform: rotate(-45deg); white-space: nowrap; }
+.bar-val { font-size: 10px; color: #333; }
 .card { padding: 20px; font-size: 24px; font-weight: 600; line-height: 1.6; background: #fff; border-radius: 8px; flex: 1; min-width: 200px; }
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }

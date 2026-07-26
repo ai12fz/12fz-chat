@@ -24,7 +24,7 @@ func (d *DB) ProxyDashboard(ctx context.Context) (today map[string]interface{}, 
 
 	daily = []map[string]interface{}{}
 	rows, _ := d.pool.Query(ctx, `SELECT created_at::date::text, COUNT(*), SUM(total_tokens), SUM(cost)::numeric
-		FROM chat.proxy_usage WHERE created_at >= CURRENT_DATE - 7
+		FROM chat.proxy_usage WHERE created_at >= CURRENT_DATE - 30
 		GROUP BY created_at::date ORDER BY created_at::date`)
 	if rows != nil {
 		defer rows.Close()
