@@ -6,9 +6,8 @@ import AdminAgents from '../views/AdminAgents.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', redirect: '/chat' },
+    { path: '/', name: 'chat', component: ChatView, meta: { requiresAuth: true } },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/chat', name: 'chat', component: ChatView, meta: { requiresAuth: true } },
     { path: '/admin/agents', name: 'admin-agents', component: AdminAgents, meta: { requiresAuth: true } },
   ],
 })
