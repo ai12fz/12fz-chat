@@ -1,36 +1,45 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin } from '../api'
+
+const GO_URL = 'https://go.12fz.com'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
-  const botId = ref(localStorage.getItem('bot_id') || '')
-  const expire = ref(Number(localStorage.getItem('expire') || '0'))
+  const userInfo = ref<any>(null)
 
-  const user = computed(() => ({
-    username: botId.value,
-    bot_id: botId.value,
-  }))
+  const user = computed(() => {
+    if (userInfo.value) {
+      const u = userInfo.value
+      return { username: u.nickname || String(u.user_id || ''), user_id: u.user_id, nickname: u.nickname, ...u }
+    }
+    const t = token.value
+    if (!t) return { username: '', bot_id: '' }
+    return { username: t.startsWith('session-') ? t.slice(8) : '用户', bot_id: '' }
+  })
 
-  async function login(username: string, password: string) {
-    const res = await apiLogin(username, password)
-    // Backend response: { token, bot_id, expire }
-    token.value = res.token
-    botId.value = res.bot_id
-    expire.value = res.expire
-    localStorage.setItem('token', res.token)
-    localStorage.setItem('bot_id', res.bot_id)
-    localStorage.setItem('expire', String(res.expire))
+  async function fetchWhoAmI() {
+    if (!token.value) return
+    try {
+      const res = await fetch('/api/whoami', {
+        headers: { Authorization: token.value }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.user_id) {
+          userInfo.value = data
+          localStorage.setItem('whoami', JSON.stringify(data))
+        }
+      }
+    } catch {}
   }
 
   function logout() {
     token.value = ''
-    botId.value = ''
-    expire.value = 0
+    userInfo.value = null
     localStorage.removeItem('token')
-    localStorage.removeItem('bot_id')
-    localStorage.removeItem('expire')
+    localStorage.removeItem('whoami')
+    window.location.href = GO_URL
   }
 
-  return { token, botId, expire, user, login, logout }
+  return { token, user, userInfo, fetchWhoAmI, logout }
 })

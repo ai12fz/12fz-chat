@@ -31,6 +31,9 @@ onMounted(async () => {
   // Connect WebSocket
   ws.connect(auth.token)
 
+  // Fetch user identity from go.12fz.com
+  await auth.fetchWhoAmI()
+
   try {
     // Load groups
     const groups = await getMyGroups()

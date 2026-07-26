@@ -7,15 +7,12 @@ import (
 )
 
 type Config struct {
-	Port       int
-	PGConnStr  string
-	JWTSecret  string
-	AdminBotID string
-	AdminPass  string
-	BotTokens  map[string]string // bot_id -> token
+	Port      int
+	PGConnStr string
+	JWTSecret string
+	BotTokens map[string]string
 }
 
-// PGConnString method to satisfy db.Connect interface
 func (c *Config) PGConnString() string { return c.PGConnStr }
 
 func Load() *Config {
@@ -29,12 +26,10 @@ func Load() *Config {
 		}
 	}
 	return &Config{
-		Port:       getEnvInt("PORT", 8081),
-		PGConnStr:  getEnv("PG_CONN", "postgresql://gong3:***@localhost:5432/aichat?sslmode=disable"),
-		JWTSecret:  getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
-		AdminBotID: getEnv("ADMIN_BOT_ID", "admin"),
-		AdminPass:  getEnv("ADMIN_PASS", "admin123"),
-		BotTokens:  bt,
+		Port:      getEnvInt("PORT", 8081),
+		PGConnStr: getEnv("PG_CONN", "postgresql://app_zhongtai:@localhost:5432/12fzsj?sslmode=disable"),
+		JWTSecret: getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
+		BotTokens: bt,
 	}
 }
 

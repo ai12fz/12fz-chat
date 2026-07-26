@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+const GO_URL = 'https://go.12fz.com'
+
 const api = axios.create({
   baseURL: '/api',
   timeout: 10000,
@@ -16,8 +18,8 @@ api.interceptors.response.use(
   err => {
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      localStorage.removeItem('whoami')
+      window.location.href = GO_URL
     }
     return Promise.reject(err)
   }
@@ -25,58 +27,17 @@ api.interceptors.response.use(
 
 export default api
 
-// ── Auth ──
-
-export async function login(username: string, password: string) {
-  const { data } = await api.post('/login', { username, password })
-  return data // { token, bot_id, expire }
-}
-
 // ── Groups ──
 
 export async function getMyGroups() {
   const { data } = await api.get('/groups/my')
-  // data = [{ id, name, created_by, created_at, last_msg_at }]
-  return data
-}
-
-export async function getGroupMembers(groupId: number) {
-  const { data } = await api.get(`/groups/${groupId}/members`)
-  // data = [{ group_id, bot_id, role, joined_at }]
-  return data
-}
-
-export async function createGroup(name: string) {
-  const { data } = await api.post('/groups', { name })
   return data
 }
 
 // ── Messages ──
 
-export async function getMessages(groupId: number, limit = 50, offset = 0) {
-  const { data } = await api.get('/messages', {
-    params: { group_id: groupId, limit, offset },
-  })
-  // data = [{ id, group_id, sender_id, content, msg_type, created_at }]
-  return data
-}
-
-export async function sendMessage(groupId: number, content: string) {
-  const { data } = await api.post('/messages', { group_id: groupId, content })
-  return data
-}
-
 export async function getUnreadCounts() {
   const { data } = await api.get('/messages/unread')
-  // data = { <group_id>: <count>, ... }
-  return data
-}
-
-export async function markRead(groupId: number, lastReadMsgId: number) {
-  const { data } = await api.post('/messages/read', {
-    group_id: groupId,
-    last_read_msg_id: lastReadMsgId,
-  })
   return data
 }
 
@@ -84,7 +45,6 @@ export async function markRead(groupId: number, lastReadMsgId: number) {
 
 export async function getFriends(userId: string) {
   const { data } = await api.get(`/friends/${userId}`)
-  // data = [{ user_id, friend_id, status, created_at }]
   return data
 }
 
@@ -94,13 +54,19 @@ export async function addFriend(userId: string, friendId: string) {
 }
 
 export async function getFriendMessages(userId: string, otherId: string) {
-  const token = localStorage.getItem("token") || ""
-  const res = await fetch("/api/friend-messages?with=" + otherId, { headers: { Authorization: token } })
+  const token = localStorage.getItem('token') || ''
+  const res = await fetch('/api/friend-messages?with=' + otherId, {
+    headers: { Authorization: token }
+  })
   return res.json()
 }
 
 export async function sendFriendMessage(friendId: string, content: string) {
-  const token = localStorage.getItem("token") || ""
-  const res = await fetch("/api/friend-messages", { method: "POST", headers: { "Content-Type": "application/json", Authorization: token }, body: JSON.stringify({ friend_id: friendId, content: content }) })
+  const token = localStorage.getItem('token') || ''
+  const res = await fetch('/api/friend-messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: token },
+    body: JSON.stringify({ friend_id: friendId, content })
+  })
   return res.json()
 }

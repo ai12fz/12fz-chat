@@ -1,49 +1,75 @@
 <template>
   <aside class="sidebar-left">
     <div class="sidebar-header">
-      <div class="user-info" @click="handleLogout" title="点击退出">
+      <div class="user-info" @click="showProfile = true" title="查看/编辑个人信息">
         <span class="avatar">{{ displayName[0] }}</span>
         <span class="name">{{ displayName }}</span>
       </div>
+      <button class="logout-btn" @click="handleLogout" title="退出登录">退出</button>
+      <button class="admin-btn" @click="goAdmin" title="Agent管理">⚙ 管理</button>
     </div>
-    <div class="search-box">
-      <input v-model="search" placeholder="搜索聊天..." />
+    <div class="tab-bar">
+      <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
+      <div class="tab" :class="{ active: activeTab === 'friends' }" @click="activeTab = 'friends'">好友</div>
     </div>
-    <nav class="session-list">
-      <!-- Group sessions -->
-      <div class="section-title">群聊</div>
-      <div v-for="s in (filteredSessions || []).filter(function(x){ return x.type !== 'friend' })" :key="s.id" class="session-item" :class="{ active: s.id === chat.activeId }" @click="chat.setActive(s.id)">
-        <span class="avatar sm" :style="{ background: avatarColor(s) }">{{ s.name[0] }}</span>
-        <div class="session-info">
-          <div class="session-top">
-            <span class="session-name">{{ s.name }}</span>
-            <span class="session-badge">群</span>
+
+    <div class="tab-content" v-show="activeTab === 'msg'">
+      <div class="search-box">
+        <input v-model="search" placeholder="搜索聊天..." />
+      </div>
+      <nav class="session-list">
+        <div v-for="s in (filteredSessions || []).filter(function(x){ return x.type !== 'friend' })" :key="s.id" class="session-item" :class="{ active: s.id === chat.activeId }" @click="chat.setActive(s.id)">
+          <span class="avatar sm" :style="{ background: avatarColor(s) }">{{ s.name[0] }}</span>
+          <div class="session-info">
+            <div class="session-top">
+              <span class="session-name">{{ s.name }}</span>
+              <span class="session-badge">群</span>
+            </div>
+            <span class="session-msg">{{ s.lastMsg || '暂无消息' }}</span>
           </div>
-          <span class="session-msg">{{ s.lastMsg || '暂无消息' }}</span>
+          <span v-if="s.unread > 0" class="unread-badge">{{ s.unread > 99 ? '99+' : s.unread }}</span>
         </div>
-        <span v-if="s.unread > 0" class="unread-badge">{{ s.unread > 99 ? '99+' : s.unread }}</span>
-      </div>
+        <div v-if="(filteredSessions || []).filter(function(x){ return x.type !== 'friend' }).length === 0" class="empty-hint">暂无会话</div>
+      </nav>
+    </div>
 
-      <!-- Friend sessions -->
-      <div class="section-title">好友</div>
-      <div v-for="f in (friends || [])" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id)">
-        <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
-        <div class="session-info">
-          <div class="session-top">
-            <span class="session-name">{{ f.friend_id }}</span>
-            <span class="session-badge">友</span>
+    <div class="tab-content" v-show="activeTab === 'friends'">
+      <nav class="session-list">
+        <div v-for="f in (friends || [])" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id)">
+          <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
+          <div class="session-info">
+            <div class="session-top">
+              <span class="session-name">{{ f.friend_id }}</span>
+              <span v-if="f.user_type === 'agent'" class="session-badge badge-agent">🤖 Agent</span>
+              <span v-else-if="f.user_type === 'human'" class="session-badge badge-human">👤 人工</span>
+            </div>
+            <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>
-          <span class="session-msg">{{ f.status || '暂无消息' }}</span>
+        </div>
+        <div v-if="(friends || []).length === 0" class="empty-hint">暂无好友</div>
+      </nav>
+      <div class="add-friend-bar">
+        <div class="session-item" @click="showAddFriend = true">
+          <span class="avatar sm" style="background: #52c41a">+</span>
+          <div class="session-info"><span class="session-name">添加好友</span></div>
         </div>
       </div>
+    </div>
 
-      <div class="session-item add-friend-btn" @click="showAddFriend = true">
-        <span class="avatar sm" style="background: #52c41a">+</span>
-        <div class="session-info"><span class="session-name">添加好友</span></div>
+    <div v-if="showProfile" class="profile-overlay" @click.self="showProfile = false">
+      <div class="profile-card">
+        <div class="profile-avatar" :style="{ background: avatarColor({name: displayName}) }">{{ displayName[0] }}</div>
+        <h3>{{ displayName }}</h3>
+        <div class="profile-form">
+          <span class="user-id-tag">ID: {{ userId || '—' }}</span>
+          <label>昵称</label>
+          <input v-model="newNickname" placeholder="输入新名称" />
+          <button class="save-btn" @click="saveNickname">保存</button>
+          <p v-if="profileMsg" class="profile-msg">{{ profileMsg }}</p>
+        </div>
+        <button class="close-btn" @click="showProfile = false">关闭</button>
       </div>
-
-      <div v-if="(filteredSessions || []).filter(function(x){ return x.type !== 'friend' }).length === 0 && (friends || []).length === 0" class="empty-hint">暂无会话</div>
-    </nav>
+    </div>
 
     <AddFriendDialog v-if="showAddFriend" @close="showAddFriend = false; loadFriends()" />
   </aside>
@@ -61,11 +87,16 @@ const router = useRouter()
 const auth = useAuthStore()
 const chat = useChatStore()
 const search = ref('')
+const activeTab = ref('msg')
 
 const friends = ref<any[]>([])
 const showAddFriend = ref(false)
+const showProfile = ref(false)
+const newNickname = ref('')
+const profileMsg = ref('')
 
-const displayName = computed(() => auth.user?.username || auth.user?.bot_id || '用户')
+const displayName = computed(() => auth.user?.nickname || auth.user?.username || '用户')
+const userId = computed(() => localStorage.getItem('user_id') || auth.user?.user_id || '')
 
 const filteredSessions = computed(() => {
   if (!search.value) return chat.sessions
@@ -79,6 +110,8 @@ function avatarColor(s: { name: string }) {
   for (let i = 0; i < s.name.length; i++) hash = s.name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
 }
+
+function goAdmin() { router.push('/admin/agents') }
 
 async function loadFriends() {
   const token = localStorage.getItem('token') || ''
@@ -98,11 +131,16 @@ function openFriendChat(friendId: string, displayName: string) {
     chat.sessions.push(session)
   }
   chat.activeId = sid
+  activeTab.value = 'msg'
 }
 
-function handleLogout() {
-  auth.logout()
-  router.push('/login')
+function handleLogout() { auth.logout() }
+
+function saveNickname() {
+  if (!newNickname.value.trim()) { profileMsg.value = '名称不能为空'; return }
+  localStorage.setItem('nickname', newNickname.value.trim())
+  profileMsg.value = '已保存'
+  setTimeout(() => { profileMsg.value = '' }, 2000)
 }
 
 loadFriends()
@@ -120,12 +158,17 @@ loadFriends()
 .sidebar-header {
   padding: 12px 16px;
   border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
+  flex: 1;
+  min-width: 0;
 }
 .avatar {
   width: 36px; height: 36px;
@@ -139,7 +182,38 @@ loadFriends()
   flex-shrink: 0;
 }
 .avatar.sm { width: 32px; height: 32px; font-size: 12px; }
-.name { font-weight: 500; font-size: 14px; }
+.name { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logout-btn, .admin-btn {
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.logout-btn:hover, .admin-btn:hover { background: #f0f0f0; }
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid #e8e8e8;
+}
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px 0;
+  font-size: 13px;
+  cursor: pointer;
+  color: #666;
+  border-bottom: 2px solid transparent;
+}
+.tab.active {
+  color: #1890ff;
+  border-bottom-color: #1890ff;
+}
+
+.tab-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
 .search-box { padding: 8px 12px; }
 .search-box input {
   width: 100%;
@@ -177,6 +251,8 @@ loadFriends()
   border-radius: 2px;
   flex-shrink: 0;
 }
+.session-badge.badge-agent { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+.session-badge.badge-human { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
 .session-msg {
   font-size: 12px;
   color: #888;
@@ -206,6 +282,36 @@ loadFriends()
   font-size: 13px;
 }
 
-.section-title { padding: 8px 16px 4px; font-size: 11px; color: #999; text-transform: uppercase; }
-.add-friend-btn { border-top: 1px solid #f0f0f0; margin-top: 8px; padding-top: 10px; }
+.add-friend-bar { border-top: 1px solid #f0f0f0; margin-top: auto; }
+
+.profile-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,.3); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-card {
+  background: #fff; border-radius: 8px; padding: 24px;
+  width: 300px; text-align: center;
+}
+.profile-avatar {
+  width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 12px;
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.profile-form { text-align: left; margin-top: 12px; }
+.profile-form label { font-size: 12px; color: #888; display: block; margin-top: 8px; }
+.profile-form input {
+  width: 100%; padding: 6px 8px; border: 1px solid #d9d9d9;
+  border-radius: 4px; font-size: 13px; box-sizing: border-box;
+}
+.user-id-tag { font-size: 12px; color: #888; }
+.save-btn {
+  margin-top: 8px; padding: 4px 12px; background: #1890ff; color: #fff;
+  border: none; border-radius: 4px; cursor: pointer; font-size: 13px;
+}
+.close-btn {
+  margin-top: 12px; padding: 4px 16px; background: #f5f5f5;
+  border: 1px solid #d9d9d9; border-radius: 4px; cursor: pointer;
+}
+.profile-msg { font-size: 12px; color: #52c41a; margin-top: 4px; }
 </style>

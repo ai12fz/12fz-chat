@@ -311,10 +311,10 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 // ── Health ──
 
 func (h *HTTPHandler) Health(w http.ResponseWriter, r *http.Request) {
-	jsonResp(w, map[string]string{
+	jsonResp(w, map[string]any{
 		"status":  "ok",
 		"service": "12fz-chat",
-		"uptime":  time.Since(h.startTime).String(),
+		"uptime":  time.Since(h.startTime).Seconds(),
 	}, 200)
 }
 
@@ -387,5 +387,5 @@ func (h *HTTPHandler) HandleFriendRequest(w http.ResponseWriter, r *http.Request
 }
 
 func (h *HTTPHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
-	jsonResp(w, map[string]int{"count": h.hub.ConnectionCount()}, 200)
+	jsonResp(w, []map[string]string{{"count": strconv.Itoa(h.hub.ConnectionCount())}}, 200)
 }

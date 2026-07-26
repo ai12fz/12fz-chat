@@ -39,7 +39,7 @@ func main() {
 	hub := ws.NewHub()
 
 	// Init auth handler
-	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.AdminBotID, cfg.AdminPass, cfg.BotTokens)
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.BotTokens)
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
@@ -52,8 +52,7 @@ func main() {
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
 	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
 	
-	// Login (public)
-	r.HandleFunc("/api/login", authHandler.Login).Methods("POST")
+	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
 
 	// REST API (authenticated)
 	api := r.PathPrefix("/api").Subrouter()

@@ -291,7 +291,7 @@ func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {
 
 func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT user_id, friend_id, status, created_at FROM chat.friends WHERE user_id = $1",
+		"SELECT f.user_id, f.friend_id, f.status, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END as user_type, f.created_at FROM chat.friends f LEFT JOIN chat_agents a ON f.friend_id = a.id WHERE f.user_id = $1",
 		userID)
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, err
 	var friends []model.Friend
 	for rows.Next() {
 		var f model.Friend
-		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.CreatedAt); err != nil {
+		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.CreatedAt); err != nil {
 			return nil, err
 		}
 		friends = append(friends, f)
