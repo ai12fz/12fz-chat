@@ -29,11 +29,11 @@ func (d *DB) ProxyDashboard(ctx context.Context) (today map[string]interface{}, 
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
-			var date string
+			var date, model string
 			var calls, tokens int
 			var cost float64
-			rows.Scan(&date, &calls, &tokens, &cost)
-			daily = append(daily, map[string]interface{}{"date": date, "calls": calls, "tokens": tokens, "cost": cost})
+			rows.Scan(&date, &calls, &tokens, &cost, &model)
+			daily = append(daily, map[string]interface{}{"date": date, "calls": calls, "tokens": tokens, "cost": cost, "model": model})
 		}
 	}
 	topModels = nil
