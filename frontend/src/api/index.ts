@@ -70,3 +70,15 @@ export async function sendFriendMessage(friendId: string, content: string) {
   })
   return res.json()
 }
+
+// ── Messages (used by ChatContent) ──
+
+export async function getMessages(groupId: number, limit = 50, offset = 0) {
+  const { data } = await api.get('/messages', { params: { group_id: groupId, limit, offset } })
+  return data
+}
+
+export async function sendMessage(groupId: number, content: string) {
+  const { data } = await api.post('/messages', { group_id: groupId, content })
+  return data
+}

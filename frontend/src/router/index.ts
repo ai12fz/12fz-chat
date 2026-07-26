@@ -6,9 +6,8 @@ const GO_URL = 'https://go.12fz.com'
 const router = createRouter({
   history: createWebHistory('/chat/'),
   routes: [
-    { path: '/', redirect: '/chat' },
-    { path: '/login', redirect: () => { window.location.href = GO_URL; return '/chat' } },
-    { path: '/chat', name: 'chat', component: ChatView },
+    { path: '/', name: 'chat', component: ChatView },
+    { path: '/login', redirect: () => { window.location.href = GO_URL; return '/' } },
     { path: '/admin/proxy', name: 'admin-proxy', component: () => import('../views/AdminProxy.vue') },
     { path: '/admin/devices', name: 'admin-devices', component: () => import('../views/AdminDevices.vue') },
     { path: '/admin/agents', name: 'admin-agents', component: () => import('../views/AdminAgents.vue') },
