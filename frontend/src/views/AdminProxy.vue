@@ -174,7 +174,7 @@ table { width: 100%; border-collapse: collapse; background: #fff; border-radius:
 th, td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-align: left; font-size: 13px; }
 th { background: #fafafa; font-weight: 500; }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; }
-.card { padding: 16px; background: #fff; border-radius: 8px; flex: 1; min-width: 200px; }
+.card { padding: 20px; font-size: 24px; font-weight: 600; line-height: 1.6; background: #fff; border-radius: 8px; flex: 1; min-width: 200px; }
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
 .form-group input, .form-group select { width: 100%; padding: 6px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
