@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -553,6 +555,8 @@ func (h *HTTPHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid device_key or registration failed: "+err.Error(), 400)
 		return
 	}
+		// Auto-add device as friend for org admin
+	h.db.AutoFriendDevice(r.Context(), dev.Name, dev.ID)
 	jsonResp(w, dev, 201)
 }
 
@@ -603,4 +607,68 @@ func (h *HTTPHandler) DeviceAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, agents, 200)
+}
+
+// PublicListDevices extracts token from header, validates via go.12fz.com, lists devices
+func (h *HTTPHandler) PublicListDevices(w http.ResponseWriter, r *http.Request) {
+	token := ExtractTokenFromHeader(r)
+	if token == "" {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+	orgID, err := h.resolveOrgFromToken(token)
+	if err != nil {
+		jsonError(w, "auth failed: "+err.Error(), 401)
+		return
+	}
+	devs, err := h.db.ListDevicesByOrg(r.Context(), orgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	key, _ := h.db.GetDeviceKeyByOrg(r.Context(), orgID)
+	jsonResp(w, map[string]interface{}{"devices": devs, "device_key": key}, 200)
+}
+
+func (h *HTTPHandler) PublicDeleteDevice(w http.ResponseWriter, r *http.Request) {
+	token := ExtractTokenFromHeader(r)
+	if token == "" {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+	_, err := h.resolveOrgFromToken(token)
+	if err != nil {
+		jsonError(w, "auth failed: "+err.Error(), 401)
+		return
+	}
+	id := mux.Vars(r)["id"]
+	if err := h.db.DeleteDevice(r.Context(), id); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+func (h *HTTPHandler) resolveOrgFromToken(token string) (string, error) {
+	req, _ := http.NewRequest("GET", "https://go.12fz.com/api/sys/home", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var upstream struct {
+		Code int `json:"code"`
+		Data struct {
+			UserInfo struct {
+				OrgID string `json:"org_id"`
+			} `json:"userInfo"`
+		} `json:"data"`
+	}
+	json.Unmarshal(body, &upstream)
+	if upstream.Data.UserInfo.OrgID == "" {
+		return "", fmt.Errorf("org not found")
+	}
+	return upstream.Data.UserInfo.OrgID, nil
 }

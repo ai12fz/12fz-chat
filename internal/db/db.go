@@ -340,6 +340,13 @@ func (d *DB) GetUnreadCountForUser(ctx context.Context, botID string) (map[int64
 
 // ── Friend ──
 
+func (d *DB) AutoFriendDevice(ctx context.Context, deviceName, deviceID string) error {
+	_, err := d.pool.Exec(ctx,
+		"INSERT INTO chat.friends (user_id, friend_id, status, user_type) VALUES ('1', $1, 'accepted', 'device') ON CONFLICT DO NOTHING",
+		deviceName)
+	return err
+}
+
 func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {
 	_, err := d.pool.Exec(ctx,
 		"INSERT INTO chat.friends (user_id, friend_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING",
@@ -349,7 +356,7 @@ func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {
 
 func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT f.user_id, f.friend_id, f.status, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END as user_type, f.created_at FROM chat.friends f LEFT JOIN chat_agents a ON f.friend_id = a.id WHERE f.user_id = $1",
+		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, f.created_at FROM chat.friends f LEFT JOIN chat_agents a ON f.friend_id = a.id WHERE f.user_id = $1",
 		userID)
 	if err != nil {
 		return nil, err

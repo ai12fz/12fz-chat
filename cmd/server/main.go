@@ -53,6 +53,8 @@ func main() {
 	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
 	
 	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
+	r.HandleFunc("/api/devices", httpHandler.PublicListDevices).Methods("GET")
+	r.HandleFunc("/api/devices/{id}", httpHandler.PublicDeleteDevice).Methods("DELETE")
 
 	// REST API (authenticated)
 	api := r.PathPrefix("/api").Subrouter()
@@ -73,10 +75,10 @@ func main() {
 	api.HandleFunc("/agents/{bot_id}", httpHandler.DeleteAgent).Methods("DELETE")
 	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.AgentGroups).Methods("GET")
 	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.SetAgentGroups).Methods("PUT")
-	api.HandleFunc("/devices", httpHandler.ListDevices).Methods("GET")
-	api.HandleFunc("/devices/{id}", httpHandler.DeleteDevice).Methods("DELETE")
-		api.HandleFunc("/devices", httpHandler.ListDevices).Methods("GET")
-	api.HandleFunc("/devices/{id}", httpHandler.DeleteDevice).Methods("DELETE")
+
+
+	
+
 	r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
 	// Proxy admin (public - auth handled internally or via nginx)
 	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")

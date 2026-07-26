@@ -58,7 +58,7 @@ const showAdd = ref(false)
 
 async function request(url: string, opts: any = {}) {
   const token = localStorage.getItem('token') || ''
-  return (await fetch('/api' + url, { headers: { 'Content-Type': 'application/json', Authorization: token }, ...opts })).json()
+  return (await fetch('/api' + url, { headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, ...opts })).json()
 }
 
 onMounted(loadData)

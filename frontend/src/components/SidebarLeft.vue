@@ -42,6 +42,7 @@
               <span class="session-name">{{ f.friend_id }}</span>
               <span v-if="f.user_type === 'agent'" class="session-badge badge-agent">🤖 Agent</span>
               <span v-else-if="f.user_type === 'human'" class="session-badge badge-human">👤 人工</span>
+              <span v-else-if="f.user_type === 'device'" class="session-badge badge-device">🖥 设备</span>
             </div>
             <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>
@@ -252,6 +253,7 @@ loadFriends()
   flex-shrink: 0;
 }
 .session-badge.badge-agent { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+.session-badge.badge-device { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
 .session-badge.badge-human { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
 .session-msg {
   font-size: 12px;

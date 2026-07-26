@@ -250,13 +250,13 @@ th { background: #fafafa; font-weight: 500; }
 .chart-box { margin-top: 24px; background: #fff; border-radius: 8px; padding: 20px; }
 .chart-box h4 { margin: 0 0 16px; font-size: 14px; color: #666; }
 .chart-wrap { position: relative; padding-bottom: 30px; }
-.ref-line { position: absolute; left: 0; right: 0; border-top: 2px dashed #f5222d; font-size: 11px; color: #f5222d; text-align: right; padding-right: 4px; z-index: 1; pointer-events: none; }
+.ref-line { position: absolute; left: 0; right: 0; border-top: 2px dashed #f5222d; font-size: 11px; color: #999; text-align: right; padding-right: 4px; z-index: 1; pointer-events: none; }
 .bar-chart { display: flex; align-items: flex-end; gap: 1px; height: 180px; padding: 0 0 4px; }
 .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; height: 100%; justify-content: flex-end; }
 .bar-stack { width: 100%; max-width: 14px; display: flex; flex-direction: column-reverse; }
 .bar-seg { width: 100%; border-radius: 1px; transition: opacity .2s; }
 .bar-seg:hover { opacity: 0.7; }
-.bar-ruler { position: absolute; right: -8px; font-size: 10px; color: #f5222d; font-weight: 600; white-space: nowrap; pointer-events: none; }
+.bar-ruler { position: absolute; right: -8px; font-size: 10px; color: #999; font-weight: 600; white-space: nowrap; pointer-events: none; }
 .bar-label { font-size: 8px; color: #999; margin-top: 4px; transform: rotate(-60deg); white-space: nowrap; transform-origin: top left; }
 .card { padding: 20px; font-size: 24px; font-weight: 600; line-height: 1.6; background: #fff; border-radius: 8px; flex: 1; min-width: 200px; }
 .form-group { margin-bottom: 12px; }
