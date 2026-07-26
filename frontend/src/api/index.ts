@@ -56,7 +56,7 @@ export async function addFriend(userId: string, friendId: string) {
 export async function getFriendMessages(userId: string, otherId: string) {
   const token = localStorage.getItem('token') || ''
   const res = await fetch('/api/friend-messages?with=' + otherId, {
-    headers: { Authorization: token }
+    headers: { Authorization: 'Bearer ' + token }
   })
   return res.json()
 }
@@ -65,7 +65,7 @@ export async function sendFriendMessage(friendId: string, content: string) {
   const token = localStorage.getItem('token') || ''
   const res = await fetch('/api/friend-messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: token },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
     body: JSON.stringify({ friend_id: friendId, content })
   })
   return res.json()

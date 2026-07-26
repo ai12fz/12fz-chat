@@ -377,9 +377,11 @@ func (h *HTTPHandler) SendFriendMessage(w http.ResponseWriter, r *http.Request) 
 	}
 	data, _ := json.Marshal(fm)
 	msg, _ := json.Marshal(ws.WSMessage{Type: "message", Data: data})
+	log.Printf("[api] SendFriendMessage: from=%s to=%s, delivering WS", botID, req.FriendID)
 	h.hub.SendToBot(req.FriendID, msg)
-	h.hub.SendToBot(botID, msg)
-	jsonResp(w, map[string]interface{}{"status": "ok", "id": id}, 200)
+	// Do NOT echo back to sender - frontend handles local display
+	// h.hub.SendToBot(botID, msg)
+	jsonResp(w, map[string]interface{}{"status": "ok", "id": id, "content": req.Content, "from": botID, "to": req.FriendID}, 200)
 }
 
 func (h *HTTPHandler) GetFriendMessages(w http.ResponseWriter, r *http.Request) {
@@ -552,12 +554,59 @@ func (h *HTTPHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	dev, err := h.db.RegisterDevice(r.Context(), req.Name, req.DeviceKey, req.OS)
 	if err != nil {
-		jsonError(w, "invalid device_key or registration failed: "+err.Error(), 400)
+		jsonError(w, "invalid or used registration code: "+err.Error(), 400)
 		return
 	}
 		// Auto-add device as friend for org admin
 	h.db.AutoFriendDevice(r.Context(), dev.Name, dev.ID)
 	jsonResp(w, dev, 201)
+}
+
+func (h *HTTPHandler) GenerateRegCode(w http.ResponseWriter, r *http.Request) {
+	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
+	if err != nil {
+		jsonError(w, "org not found", 400)
+		return
+	}
+	code, err := h.db.GenerateRegCode(r.Context(), orgID, getBotID(r))
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]interface{}{"code": code, "install_cmd": "curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=" + code}, 201)
+}
+
+func (h *HTTPHandler) ListRegCodes(w http.ResponseWriter, r *http.Request) {
+	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
+	if err != nil {
+		jsonError(w, "org not found", 400)
+		return
+	}
+	codes, err := h.db.ListRegCodes(r.Context(), orgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, codes, 200)
+}
+
+func (h *HTTPHandler) RevokeRegCode(w http.ResponseWriter, r *http.Request) {
+	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
+	if err != nil {
+		jsonError(w, "org not found", 400)
+		return
+	}
+	code := mux.Vars(r)["code"]
+	if err := h.db.RevokeRegCode(r.Context(), orgID, code); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+func parseInt64(s string) int64 {
+	n, _ := strconv.ParseInt(s, 10, 64)
+	return n
 }
 
 func (h *HTTPHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
@@ -577,8 +626,7 @@ func (h *HTTPHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), 500)
 		return
 	}
-	key, _ := h.db.GetDeviceKeyByOrg(r.Context(), orgID)
-	jsonResp(w, map[string]interface{}{"devices": devs, "device_key": key}, 200)
+	jsonResp(w, map[string]interface{}{"devices": devs}, 200)
 }
 
 func (h *HTTPHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
@@ -626,8 +674,7 @@ func (h *HTTPHandler) PublicListDevices(w http.ResponseWriter, r *http.Request) 
 		jsonError(w, err.Error(), 500)
 		return
 	}
-	key, _ := h.db.GetDeviceKeyByOrg(r.Context(), orgID)
-	jsonResp(w, map[string]interface{}{"devices": devs, "device_key": key}, 200)
+	jsonResp(w, map[string]interface{}{"devices": devs}, 200)
 }
 
 func (h *HTTPHandler) PublicDeleteDevice(w http.ResponseWriter, r *http.Request) {

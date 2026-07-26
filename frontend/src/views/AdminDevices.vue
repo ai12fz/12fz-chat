@@ -8,14 +8,29 @@
         <router-link to="/admin/agents">Agent管理</router-link>
       </div>
       <div class="header-actions">
-        <button class="btn-primary" @click="showAdd = true">+ 添加设备</button>
+        <button class="btn-primary" @click="genCode">+ 生成注册码</button>
         <button class="btn-outline" @click="loadData">刷新</button>
       </div>
     </div>
 
-    <div v-if="deviceKey" class="key-card">
-      <span>设备注册密钥：<code>{{ deviceKey }}</code></span>
-      <button @click="copyKey">复制密钥</button>
+    <div class="key-card">
+      <h3>注册码（每设备独立，一次一码）</h3>
+      <table v-if="regCodes.length" class="table">
+        <thead><tr><th>注册码</th><th>状态</th><th>设备</th><th>创建</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr v-for="rc in regCodes" :key="rc.code">
+            <td><code>{{ rc.code }}</code></td>
+            <td>{{ rc.status === 'active' ? '有效' : rc.status === 'used' ? '已用' : '已撤销' }}</td>
+            <td>{{ rc.device_id || '—' }}</td>
+            <td>{{ fmt(rc.created_at) }}</td>
+            <td>
+              <button class="btn-sm" @click="copyText('curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=' + rc.code)">复制安装命令</button>
+              <button v-if="rc.status==='active'" class="btn-danger btn-sm" @click="revokeCode(rc.code)">撤销</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty">暂无注册码</div>
     </div>
 
     <table v-if="devices.length" class="table">
@@ -31,21 +46,7 @@
         </tr>
       </tbody>
     </table>
-    <div v-else class="empty">暂无设备</div>
-
-    <div v-if="showAdd" class="overlay" @click.self="showAdd = false">
-      <div class="modal">
-        <h3>添加设备</h3>
-        <p>在目标设备上运行以下命令：</p>
-        <div class="install-box">
-          <pre @click="copy('linux')">curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code={{ deviceKey }}</pre>
-          <pre @click="copy('win')"># Windows PowerShell
-irm https://ai.12fz.com/install-device.ps1 | iex -Code {{ deviceKey }}</pre>
-        </div>
-        <p class="tip">密钥 24 小时内有效，运行后设备自动出现在列表中</p>
-        <button class="btn-outline" style="width:100%" @click="showAdd = false; loadData()">关闭</button>
-      </div>
-    </div>
+    <div v-if="!devices.length" class="empty">暂无设备</div>
   </div>
 </template>
 
@@ -53,76 +54,83 @@ irm https://ai.12fz.com/install-device.ps1 | iex -Code {{ deviceKey }}</pre>
 import { ref, onMounted } from 'vue'
 
 const devices = ref<any[]>([])
-const deviceKey = ref('')
-const showAdd = ref(false)
+const regCodes = ref<any[]>([])
 
 async function request(url: string, opts: any = {}) {
   const token = localStorage.getItem('token') || ''
-  return (await fetch('/api' + url, { headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, ...opts })).json()
+  const h: any = { Authorization: 'Bearer ' + token }
+  if (opts.body) h['Content-Type'] = 'application/json'
+  const resp = await fetch(url, { ...opts, headers: { ...h, ...opts.headers } })
+  return resp.json()
 }
 
 onMounted(loadData)
 
 async function loadData() {
-  const d = await request('/devices')
-  devices.value = d.devices || []
-  deviceKey.value = d.device_key || ''
+  try {
+    const d = await request('/api/devices')
+    if (d && d.devices) devices.value = d.devices
+  } catch(_) {}
+  try {
+    const rc = await request('/api/device-reg-codes')
+    if (Array.isArray(rc)) regCodes.value = rc
+  } catch(_) {}
+}
+
+async function genCode() {
+  try {
+    const r = await request('/api/device-reg-codes', { method: 'POST' })
+    if (r.code) alert('注册码: ' + r.code)
+    else if (r.error) alert('错误: ' + r.error)
+    else alert('未知响应: ' + JSON.stringify(r))
+  } catch(e: any) { alert('异常: ' + (e.message||String(e)) + ' | token=' + (localStorage.getItem('token')||'none')) }
+  loadData()
+}
+
+async function revokeCode(code: string) {
+  await request('/api/device-reg-codes/' + encodeURIComponent(code), { method: 'DELETE' })
+  loadData()
+}
+
+function copyText(t: string) {
+  navigator.clipboard.writeText(t).catch(function(){})
 }
 
 async function startRename(d: any) {
   const name = prompt('新名称', d.name)
   if (name && name !== d.name) {
-    d.name = name
-    alert('已修改（仅本地显示，需后端支持 rename 接口）')
+    await request('/api/devices/' + encodeURIComponent(d.id), { method: 'PATCH', body: JSON.stringify({ name }) })
+    loadData()
   }
 }
 
 async function del(d: any) {
-  if (!confirm('删除 ' + d.name + '？')) return
-  await request('/devices/' + encodeURIComponent(d.id), { method: 'DELETE' })
-  await loadData()
-}
-
-function copyKey() {
-  navigator.clipboard.writeText(deviceKey.value)
-  alert('已复制')
-}
-
-function copy(os: string) {
-  const cmd = os === 'linux'
-    ? 'curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=' + deviceKey.value
-    : 'irm https://ai.12fz.com/install-device.ps1 | iex -Code ' + deviceKey.value
-  navigator.clipboard.writeText(cmd)
-  alert('已复制，粘贴到目标设备终端执行')
+  await request('/api/devices/' + encodeURIComponent(d.id), { method: 'DELETE' })
+  loadData()
 }
 
 function fmt(t: string) {
-  if (!t || t.startsWith('0001')) return '—'
-  return new Date(t).toLocaleString()
+  return t ? new Date(t).toLocaleString('zh-CN') : '—'
 }
 </script>
 
 <style scoped>
 .admin-devices { padding: 20px; }
-.admin-header { margin-bottom: 16px; }
-.admin-nav { display: flex; gap: 12px; margin-bottom: 12px; }
-.admin-nav a { color: #1890ff; text-decoration: none; font-size: 14px; }
-.header-actions { display: flex; gap: 8px; margin-bottom: 16px; }
-.btn-primary { padding: 6px 16px; background: #1890ff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.btn-outline { padding: 6px 16px; background: #fff; color: #1890ff; border: 1px solid #1890ff; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.btn-danger { padding: 4px 10px; background: #fff; color: #f5222d; border: 1px solid #f5222d; border-radius: 4px; cursor: pointer; font-size: 12px; }
-.key-card { background: #e6f7ff; padding: 12px; border-radius: 6px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
-.key-card code { background: #fff; padding: 4px 8px; border-radius: 3px; font-size: 13px; }
-.table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
-.table th,.table td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; font-size: 13px; text-align: left; }
-.table th { background: #fafafa; font-weight: 500; }
-.tag { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
-.tag.online { background: #f6ffed; color: #52c41a; }
-.tag.offline,.tag.unknown { background: #fff2f0; color: #f5222d; }
-.empty { text-align: center; color: #999; padding: 48px; }
-.overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.3); z-index:1000; display:flex; align-items:center; justify-content:center; }
-.modal { background:#fff; border-radius:8px; padding:24px; width:550px; max-width:90vw; }
-.modal h3 { margin:0 0 16px; }
-.install-box pre { background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:4px; font-size:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-all; margin:8px 0; }
-.tip { color: #888; font-size: 12px; margin-top: 8px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.admin-nav { display: flex; gap: 12px; }
+.admin-nav a { color: #666; text-decoration: none; }
+.admin-nav a.router-link-active { color: #6366f1; font-weight: bold; }
+.header-actions { display: flex; gap: 8px; }
+.btn-primary { background: #6366f1; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.btn-outline { background: #fff; border: 1px solid #ddd; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.btn-danger { background: #ef4444; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+.btn-sm { background: #f0f0f0; border: 1px solid #ddd; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.key-card { background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+.key-card h3 { margin-top: 0; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 8px 12px; border-bottom: 1px solid #eee; text-align: left; }
+.table th { background: #f9fafb; font-size: 13px; color: #666; }
+.tag.online { background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.tag.offline { background: #f3f4f6; color: #9ca3af; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.empty { color: #999; padding: 20px; }
 </style>

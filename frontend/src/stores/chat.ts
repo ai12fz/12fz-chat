@@ -102,6 +102,31 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Add a received message to a session */
   function receiveMessage(msg: BackendMessage) {
+    // Friend message (from WS: {from, to, content, timestamp})
+    if ((msg as any).from && (msg as any).to && !msg.group_id) {
+      const friendId = (msg as any).from
+      const sessionId = 'friend:' + friendId
+      let s = sessions.value.find(x => x.id === sessionId)
+      if (!s) {
+        s = { id: sessionId, name: friendId, type: 'friend', messages: [] as any[], members: [], lastMsg: '', lastMsgAt: '' } as any
+        sessions.value.push(s)
+      }
+      // Only add if not duplicate
+      if (!s.messages.some(function(m: any){ return m.content === msg.content && m.sender_id === friendId })) {
+        s.messages.push({
+          id: (msg as any).id || Date.now(),
+          group_id: 0,
+          sender_id: friendId,
+          content: msg.content,
+          msg_type: 'text',
+          created_at: (msg as any).created_at || new Date().toISOString(),
+        })
+      }
+      s.lastMsg = msg.content
+      s.lastMsgAt = (msg as any).created_at || new Date().toISOString()
+      if (sessionId !== activeId.value) s.unread++
+      return
+    }
     const sessionId = groupSessionId(msg.group_id)
     const s = sessions.value.find(s => s.id === sessionId)
     if (!s) return

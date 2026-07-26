@@ -18,24 +18,27 @@
         <input v-model="search" placeholder="搜索聊天..." />
       </div>
       <nav class="session-list">
-        <div v-for="s in (filteredSessions || []).filter(function(x){ return x.type !== 'friend' })" :key="s.id" class="session-item" :class="{ active: s.id === chat.activeId }" @click="chat.setActive(s.id)">
+        <div v-for="s in sortedSessions" :key="s.id" class="session-item" :class="{ active: s.id === chat.activeId }" @click="chat.setActive(s.id)">
           <span class="avatar sm" :style="{ background: avatarColor(s) }">{{ s.name[0] }}</span>
           <div class="session-info">
             <div class="session-top">
               <span class="session-name">{{ s.name }}</span>
-              <span class="session-badge">群</span>
+              <span v-if="s.type === 'group'" class="session-badge">群</span>
+              <span v-else-if="s.userType === 'agent'" class="session-badge badge-agent">🤖 Agent</span>
+              <span v-else-if="s.userType === 'device'" class="session-badge badge-device">🖥 设备</span>
+              <span v-else class="session-badge badge-human">👤 好友</span>
             </div>
             <span class="session-msg">{{ s.lastMsg || '暂无消息' }}</span>
           </div>
           <span v-if="s.unread > 0" class="unread-badge">{{ s.unread > 99 ? '99+' : s.unread }}</span>
         </div>
-        <div v-if="(filteredSessions || []).filter(function(x){ return x.type !== 'friend' }).length === 0" class="empty-hint">暂无会话</div>
+        <div v-if="sortedSessions.length === 0" class="empty-hint">暂无会话</div>
       </nav>
     </div>
 
     <div class="tab-content" v-show="activeTab === 'friends'">
       <nav class="session-list">
-        <div v-for="f in (friends || [])" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id)">
+        <div v-for="f in (friends || [])" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
           <div class="session-info">
             <div class="session-top">
@@ -99,6 +102,16 @@ const profileMsg = ref('')
 const displayName = computed(() => auth.user?.nickname || auth.user?.username || '用户')
 const userId = computed(() => localStorage.getItem('user_id') || auth.user?.user_id || '')
 
+const sortedSessions = computed(() => {
+  return [...chat.sessions].sort(function(a,b){
+    var at = a.lastMsgAt || ''
+    var bt = b.lastMsgAt || ''
+    if (at > bt) return -1
+    if (at < bt) return 1
+    return 0
+  })
+})
+
 const filteredSessions = computed(() => {
   if (!search.value) return chat.sessions
   const q = search.value.toLowerCase()
@@ -124,11 +137,11 @@ async function loadFriends() {
   } catch(e) { console.error('Failed to load friends:', e) }
 }
 
-function openFriendChat(friendId: string, displayName: string) {
+function openFriendChat(friendId: string, displayName: string, userType: string) {
   const sid = 'friend:' + friendId
   let session = chat.sessions.find((s: any) => s.id === sid)
   if (!session) {
-    session = { id: sid, name: displayName, type: 'friend', messages: [], members: [] }
+    session = { id: sid, name: displayName, type: 'friend', userType: userType || 'human', messages: [], members: [], lastMsg: '', lastMsgAt: new Date().toISOString() }
     chat.sessions.push(session)
   }
   chat.activeId = sid

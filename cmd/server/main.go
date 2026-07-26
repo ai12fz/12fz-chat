@@ -111,9 +111,11 @@ func main() {
 	api.HandleFunc("/friend-messages", httpHandler.GetFriendMessages).Methods("GET")
 
 	// WebSocket - token-based auth
+	api.HandleFunc("/device-reg-codes", httpHandler.GenerateRegCode).Methods("POST")
+	api.HandleFunc("/device-reg-codes", httpHandler.ListRegCodes).Methods("GET")
+	api.HandleFunc("/device-reg-codes/{code}", httpHandler.RevokeRegCode).Methods("DELETE")
 	r.HandleFunc("/api/devices/register", httpHandler.RegisterDevice).Methods("POST")
-	r.HandleFunc("/api/devices/register", httpHandler.RegisterDevice).Methods("POST")
-	r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
+		r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
 	// Proxy admin (public - auth handled internally or via nginx)
 	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
 	r.HandleFunc("/admin/proxy/models", httpHandler.ProxyListModels).Methods("GET")

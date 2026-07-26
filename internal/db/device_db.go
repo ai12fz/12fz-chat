@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"encoding/hex"
 	"time"
 )
@@ -20,10 +21,11 @@ type Device struct {
 
 func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*Device, error) {
 	var orgID string
-	err := d.platformPool.QueryRow(ctx,
-		"SELECT org_id::text FROM org_merchant WHERE device_key = $1 AND device_key IS NOT NULL", deviceKey).Scan(&orgID)
+	err := d.pool.QueryRow(ctx,
+		"UPDATE chat.device_reg_codes SET status='used', used_at=now() WHERE code=$1 AND status='active' RETURNING org_id::text",
+		deviceKey).Scan(&orgID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid or used registration code")
 	}
 	token := generateToken()
 	dev := &Device{Name: name, OrgID: orgID, Token: token, OS: os, Status: "online"}
@@ -33,6 +35,7 @@ func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*D
 	if err != nil {
 		return nil, err
 	}
+	d.pool.Exec(ctx, "UPDATE chat.device_reg_codes SET device_id=$1 WHERE code=$2", dev.ID, deviceKey)
 	return dev, nil
 }
 
@@ -68,13 +71,6 @@ func (d *DB) DeleteDevice(ctx context.Context, id string) error {
 	return err
 }
 
-func (d *DB) GetDeviceKeyByOrg(ctx context.Context, orgID string) (string, error) {
-	var key string
-	err := d.platformPool.QueryRow(ctx,
-		"SELECT COALESCE(device_key, '') FROM org_merchant WHERE org_id=$1", orgID).Scan(&key)
-	return key, err
-}
-
 func (d *DB) PendingAgentsByOrg(ctx context.Context, orgID string) ([]Agent, error) {
 	rows, err := d.pool.Query(ctx,
 		"SELECT id, bot_id, display_name, model, system_prompt, capabilities, status, COALESCE(api_key,''), COALESCE(api_url,''), COALESCE(merchant_id,'') FROM chat.agents WHERE merchant_id=$1 AND status='active' ORDER BY id",
@@ -98,4 +94,58 @@ func generateToken() string {
 	b := make([]byte, 20)
 	rand.Read(b)
 	return "d_" + hex.EncodeToString(b)
+}
+
+func randomString(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	rb := make([]byte, n)
+	rand.Read(rb)
+	for i := range b {
+		b[i] = chars[rb[i]%36]
+	}
+	return string(b)
+}
+
+func (db *DB) GenerateRegCode(ctx context.Context, orgID string, createdBy string) (string, error) {
+	code := "dev-" + randomString(12)
+	var exists bool
+	err := db.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM chat.device_reg_codes WHERE code=$1)", code).Scan(&exists)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return db.GenerateRegCode(ctx, orgID, createdBy)
+	}
+	_, err = db.pool.Exec(ctx, "INSERT INTO chat.device_reg_codes (code, org_id, created_by) VALUES ($1,$2,$3)", code, orgID, createdBy)
+	return code, err
+}
+
+func (db *DB) ListRegCodes(ctx context.Context, orgID string) ([]map[string]interface{}, error) {
+	rows, err := db.pool.Query(ctx, "SELECT code, status, device_id, created_at, used_at FROM chat.device_reg_codes WHERE org_id=$1 AND status!=$2 ORDER BY created_at DESC", orgID, "revoked")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var codes []map[string]interface{}
+	for rows.Next() {
+		var code, status string
+		var deviceID *string
+		var createdAt, usedAt *time.Time
+		if err := rows.Scan(&code, &status, &deviceID, &createdAt, &usedAt); err != nil {
+			continue
+		}
+		codes = append(codes, map[string]interface{}{
+			"code": code, "status": status, "created_at": createdAt, "used_at": usedAt,
+		})
+		if deviceID != nil {
+			codes[len(codes)-1]["device_id"] = *deviceID
+		}
+	}
+	return codes, nil
+}
+
+func (db *DB) RevokeRegCode(ctx context.Context, orgID, code string) error {
+	_, err := db.pool.Exec(ctx, "UPDATE chat.device_reg_codes SET status=$1 WHERE org_id=$2 AND code=$3 AND status=$4", "revoked", orgID, code, "active")
+	return err
 }

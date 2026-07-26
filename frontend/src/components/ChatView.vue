@@ -123,19 +123,22 @@ function handleSend() {
   const fmatch = session.value.id.match(/^friend:(.+)$/)
   if (fmatch) {
     ws.sendMessage(fmatch[1], content)
-    sendFriendMessage(fmatch[1], content).then(function(res: any){
-      if (res && res.id) {
-        const sid2 = 'friend:' + fmatch[1]
-        const idx2 = chat.sessions.findIndex(function(x: any){ return x.id === sid2 })
-        if (idx2 >= 0) {
-          chat.sessions[idx2].messages.push({
-            id: res.id, group_id: 0,
-            sender_id: auth.userId || 'me', content: content,
-            msg_type: 'text', created_at: new Date().toISOString()
-          })
-        }
+    sendFriendMessage(fmatch[1], content).then(res => {
+      // Add to local message list immediately (friend WS echo not supported)
+      if (session.value && res && res.id) {
+        session.value.messages.push({
+          id: res.id,
+          group_id: fmatch[1],
+          sender_id: auth.userId || auth.userId || 'me',
+          content: content,
+          msg_type: 'text',
+          created_at: new Date().toISOString()
+        })
+        session.value.lastMsg = content
+        session.value.lastMsgAt = new Date().toISOString()
       }
     }).catch(function(){})
+    if (session.value) session.value.lastMsgAt = new Date().toISOString()
   }
   text.value = ''
   showEmoji.value = false

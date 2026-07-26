@@ -11,9 +11,9 @@ type Friend struct {
 }
 
 type FriendMessage struct {
-	ID        int64
-	FromID    string
-	ToID      string
-	Content   string
-	CreatedAt time.Time
+	ID        int64     `json:"id"`
+	FromID    string    `json:"from_id"`
+	ToID      string    `json:"to_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
 }
