@@ -15,15 +15,25 @@
     <!-- Dashboard -->
     <div v-if="tab === 'dashboard'">
       <div class="cards">
-        <div class="card" v-for="(v, k) in stats" :key="k">{{ k }}: {{ v.calls }}次 | {{ v.tokens }}tk | ¥{{ (v.cost||0).toFixed(4) }}</div>
+        <div class="card" v-for="(v, k) in stats" :key="k">
+          <div class="card-label">{{ k }}</div>
+          <div class="card-num">{{ v.calls }}<small> 次</small></div>
+          <div class="card-sub">{{ v.tokens }} tk · ¥{{ (v.cost||0).toFixed(2) }}</div>
+        </div>
       </div>
-      <div class="chart-box" v-if="dailyData.length">
-        <h4>近30天调用量</h4>
-        <div class="bar-chart">
-          <div class="bar-col" v-for="d in dailyData" :key="d.date">
-            <div class="bar" :style="{ height: barHeight(d.calls) }"></div>
-            <span class="bar-label">{{ d.date.slice(5) }}</span>
-            <span class="bar-val">{{ d.calls }}</span>
+      <div class="chart-box" v-if="chartDates.length">
+        <h4>近30天 Token 消耗（按模型）</h4>
+        <div class="chart-wrap" style="position:relative">
+          <div class="ref-line" :style="{ bottom: refLineY + 'px' }">{{ Math.round(refValue/1000) }}k</div>
+          <div class="bar-chart">
+            <div class="bar-col" v-for="d in chartDates" :key="d">
+              <div class="bar-stack">
+                <div v-for="(seg, i) in (chartMap[d]||[])" :key="i"
+                  class="bar-seg" :style="{ height: segH(seg.tokens), background: seg.color }"
+                  :title="seg.model+': '+seg.tokens+' tk'"></div>
+              </div>
+              <span class="bar-label">{{ d.slice(5) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -132,6 +142,12 @@ const tab = ref('dashboard')
 
 const stats = ref<any>({})
 const dailyData = ref<any[]>([])
+const chartDates = ref<string[]>([])
+const chartMap = ref<Record<string,any[]>>({})
+const chartMax = ref(1)
+const refValue = ref(0)
+const refLineY = ref(40)
+const MODEL_COLORS = ["#1890ff","#52c41a","#fa8c16","#eb2f96","#722ed1","#13c2c2","#f5222d","#faad14"]
 const models = ref<any[]>([])
 const pricing = ref<any[]>([])
 const multiplier = ref(2)
@@ -149,7 +165,37 @@ async function call(url: string, opts: any = {}) {
 }
 
 watch(tab, async t => {
-  if (t === 'dashboard') { const d = await call('/admin/proxy/dashboard'); stats.value = { '今日': d.today, '本月': d.month }; dailyData.value = d.daily || [] }
+  if (t === 'dashboard') {
+  const d = await call('/admin/proxy/dashboard')
+  stats.value = { '今日': d.today, '本月': d.month }
+  dailyData.value = d.daily || []
+  // Build chart data grouped by date+model
+  const dateMap: Record<string,Record<string,number>> = {}
+  const models = new Set<string>()
+  for (const r of dailyData.value) {
+    if (!dateMap[r.date]) dateMap[r.date] = {}
+    dateMap[r.date][r.model||'unknown'] = (dateMap[r.date][r.model||'unknown']||0) + r.tokens
+    models.add(r.model||'unknown')
+  }
+  chartDates.value = Object.keys(dateMap).sort()
+  chartMap.value = {}
+  const colors = [...MODEL_COLORS]
+  const modelColor: Record<string,string> = {}
+  let ci = 0
+  for (const m of models) { modelColor[m] = colors[ci++ % colors.length] }
+  chartMax.value = 1
+  for (const date of chartDates.value) {
+    chartMap.value[date] = Object.entries(dateMap[date]).map(([model, tokens]) => ({
+      model, tokens, color: modelColor[model]
+    })).sort((a,b) => b.tokens - a.tokens)
+    const total = Object.values(dateMap[date]).reduce((s,v)=>s+v,0)
+    if (total > chartMax.value) chartMax.value = total
+  }
+  // Reference line = average daily tokens
+  const totals = chartDates.value.map(d => Object.values(dateMap[d]).reduce((s,v)=>s+v,0))
+  refValue.value = totals.length ? totals.reduce((s,v)=>s+v,0) / totals.length : 0
+  refLineY.value = 34 + (refValue.value / chartMax.value) * 140
+}
   if (t === 'models') models.value = await call('/admin/proxy/models')
   if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
   if (t === 'merchants') merchants.value = await call('/admin/proxy/merchants')
@@ -170,7 +216,8 @@ async function recharge(m: any) { const amount = prompt('充值金额(元)'); if
 async function showLedger(m: any) { ledger.value = await call('/admin/proxy/merchants/' + m.org_id + '/ledger') }
 async function createKey() { const r = await call('/admin/proxy/keys', { method: 'POST', body: JSON.stringify({ org_id: keyOrgId.value, name: keyName.value }) }); alert('Key: ' + (r as any).key_text); keys.value = await call('/admin/proxy/keys?org_id=' + keyOrgId.value) }
 async function revokeKey(k: any) { await call('/admin/proxy/keys/' + k.id + '/revoke', { method: 'POST' }); keys.value = await call('/admin/proxy/keys?org_id=' + k.org_id) }
-function barHeight(v: number) { const max = Math.max(...dailyData.value.map((d:any)=>d.calls), 1); return (v/max*150)+'px' }
+function segH(v: number) { return Math.max((v/chartMax.value)*140, 2)+'px' }
+
 </script>
 
 <style scoped>
@@ -186,13 +233,20 @@ table { width: 100%; border-collapse: collapse; background: #fff; border-radius:
 th, td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-align: left; font-size: 13px; }
 th { background: #fafafa; font-weight: 500; }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.card-label { font-size: 13px; color: #888; margin-bottom: 4px; }
+.card-num { font-size: 32px; font-weight: 700; line-height: 1.1; }
+.card-num small { font-size: 14px; font-weight: 400; color: #999; }
+.card-sub { font-size: 13px; color: #666; margin-top: 4px; }
 .chart-box { margin-top: 24px; background: #fff; border-radius: 8px; padding: 20px; }
 .chart-box h4 { margin: 0 0 16px; font-size: 14px; color: #666; }
-.bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 200px; padding-bottom: 24px; border-bottom: 1px solid #eee; }
-.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
-.bar { width: 100%; max-width: 20px; background: #1890ff; border-radius: 2px 2px 0 0; min-height: 2px; }
-.bar-label { font-size: 9px; color: #999; margin-top: 4px; transform: rotate(-45deg); white-space: nowrap; }
-.bar-val { font-size: 10px; color: #333; }
+.chart-wrap { position: relative; padding-bottom: 30px; }
+.ref-line { position: absolute; left: 0; right: 0; border-top: 2px dashed #f5222d; font-size: 11px; color: #f5222d; text-align: right; padding-right: 4px; z-index: 1; pointer-events: none; }
+.bar-chart { display: flex; align-items: flex-end; gap: 1px; height: 180px; padding: 0 0 4px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; height: 100%; justify-content: flex-end; }
+.bar-stack { width: 100%; max-width: 14px; display: flex; flex-direction: column-reverse; }
+.bar-seg { width: 100%; border-radius: 1px; transition: opacity .2s; }
+.bar-seg:hover { opacity: 0.7; }
+.bar-label { font-size: 8px; color: #999; margin-top: 4px; transform: rotate(-60deg); white-space: nowrap; transform-origin: top left; }
 .card { padding: 20px; font-size: 24px; font-weight: 600; line-height: 1.6; background: #fff; border-radius: 8px; flex: 1; min-width: 200px; }
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
