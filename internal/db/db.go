@@ -64,12 +64,20 @@ type OrgUser struct {
 }
 
 func (d *DB) GetOrgUserByID(ctx context.Context, userID int64) (*OrgUser, error) {
+
 	var u OrgUser
 	err := d.platformPool.QueryRow(ctx,
 		"SELECT user_id, nickname, phone, COALESCE(email, ''), status FROM org_user WHERE user_id = $1",
 		userID,
 	).Scan(&u.UserID, &u.Nickname, &u.Phone, &u.Email, &u.Status)
 	return &u, err
+}
+
+func (d *DB) GetOrgID(ctx context.Context, userID int64) (string, error) {
+	var orgID string
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT org_id::text FROM org_user WHERE user_id = $1", userID).Scan(&orgID)
+	return orgID, err
 }
 
 func (d *DB) GetOrgUserForLogin(ctx context.Context, account, password string) (*OrgUser, error) {

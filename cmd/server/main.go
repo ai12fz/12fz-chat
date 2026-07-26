@@ -74,12 +74,16 @@ func main() {
 	api.HandleFunc("/agents/{bot_id}", httpHandler.DeleteAgent).Methods("DELETE")
 	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.AgentGroups).Methods("GET")
 	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.SetAgentGroups).Methods("PUT")
+	api.HandleFunc("/devices", httpHandler.ListDevices).Methods("GET")
+	api.HandleFunc("/devices/{id}", httpHandler.DeleteDevice).Methods("DELETE")
+		api.HandleFunc("/devices", httpHandler.ListDevices).Methods("GET")
+	api.HandleFunc("/devices/{id}", httpHandler.DeleteDevice).Methods("DELETE")
+	r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
 
 	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 	api.HandleFunc("/agent-status", httpHandler.GetAgentStatus).Methods("GET")
-
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
 	api.HandleFunc("/users/{id}", httpHandler.GetUserInfo).Methods("GET")
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
@@ -90,6 +94,9 @@ func main() {
 	api.HandleFunc("/friend-messages", httpHandler.GetFriendMessages).Methods("GET")
 
 	// WebSocket - token-based auth
+	r.HandleFunc("/api/devices/register", httpHandler.RegisterDevice).Methods("POST")
+	r.HandleFunc("/api/devices/register", httpHandler.RegisterDevice).Methods("POST")
+	r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
 		if token == "" {

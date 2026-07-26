@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import ChatView from '../views/ChatView.vue'
+import AdminDevices from '../views/AdminDevices.vue'
 import AdminAgents from '../views/AdminAgents.vue'
 
 const router = createRouter({
@@ -8,6 +9,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'chat', component: ChatView, meta: { requiresAuth: true } },
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/admin/devices', name: 'admin-devices', component: AdminDevices, meta: { requiresAuth: true } },
     { path: '/admin/agents', name: 'admin-agents', component: AdminAgents, meta: { requiresAuth: true } },
   ],
 })

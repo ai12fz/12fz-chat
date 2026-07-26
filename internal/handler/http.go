@@ -550,3 +550,71 @@ func (h *HTTPHandler) SetAgentGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResp(w, map[string]string{"status": "ok"}, 200)
 }
+
+
+func (h *HTTPHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name      string `json:"name"`
+		DeviceKey string `json:"device_key"`
+		OS        string `json:"os"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.DeviceKey == "" {
+		jsonError(w, "name and device_key required", 400)
+		return
+	}
+	dev, err := h.db.RegisterDevice(r.Context(), req.Name, req.DeviceKey, req.OS)
+	if err != nil {
+		jsonError(w, "invalid device_key or registration failed: "+err.Error(), 400)
+		return
+	}
+	jsonResp(w, dev, 201)
+}
+
+func (h *HTTPHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	uid, err := strconv.ParseInt(botID, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user", 400)
+		return
+	}
+	orgID, err := h.db.GetOrgID(r.Context(), uid)
+	if err != nil {
+		jsonError(w, "org not found", 400)
+		return
+	}
+	devs, err := h.db.ListDevicesByOrg(r.Context(), orgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	key, _ := h.db.GetDeviceKeyByOrg(r.Context(), orgID)
+	jsonResp(w, map[string]interface{}{"devices": devs, "device_key": key}, 200)
+}
+
+func (h *HTTPHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	if err := h.db.DeleteDevice(r.Context(), id); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "deleted"}, 200)
+}
+
+func (h *HTTPHandler) DeviceAgents(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		jsonError(w, "token required", 401)
+		return
+	}
+	dev, err := h.db.ValidateDeviceToken(r.Context(), token)
+	if err != nil {
+		jsonError(w, "invalid token", 401)
+		return
+	}
+	agents, err := h.db.PendingAgentsByOrg(r.Context(), dev.OrgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, agents, 200)
+}
