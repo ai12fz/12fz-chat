@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -60,6 +62,10 @@ func (h *HTTPHandler) AuthMiddleware(next http.Handler) http.Handler {
 // getBotID extracts bot_id from request context
 func getBotID(r *http.Request) string {
 	if v, ok := r.Context().Value(contextBotID).(string); ok {
+		// Strip :chat suffix (used by iframe connections)
+		if idx := strings.Index(v, ":"); idx > 0 {
+			return v[:idx]
+		}
 		return v
 	}
 	return ""
@@ -576,6 +582,52 @@ func (h *HTTPHandler) GenerateRegCode(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]interface{}{"code": code, "install_cmd": "curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=" + code}, 201)
 }
 
+func (h *HTTPHandler) DeviceSetup(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		jsonError(w, "missing token", 400)
+		return
+	}
+	_, err := h.db.ValidateDeviceToken(r.Context(), token)
+	if err != nil {
+		jsonError(w, "invalid token", 401)
+		return
+	}
+	b := make([]byte, 24)
+	rand.Read(b)
+	key := "sk-dev-" + hex.EncodeToString(b)
+	h.db.StoreAPIKey(r.Context(), key, token)
+	jsonResp(w, map[string]interface{}{"key": key, "balance": 100000}, 200)
+}
+
+
+// ProxyChat forwards /v1/chat/completions to new-api
+func (h *HTTPHandler) ProxyChat(w http.ResponseWriter, r *http.Request) {
+	proxyRequest(w, r, "http://127.0.0.1:3002/v1/chat/completions")
+}
+
+// ProxyModels forwards /v1/models to new-api
+func (h *HTTPHandler) ProxyModels(w http.ResponseWriter, r *http.Request) {
+	proxyRequest(w, r, "http://127.0.0.1:3002/v1/models")
+}
+
+func proxyRequest(w http.ResponseWriter, r *http.Request, target string) {
+	body, _ := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	req, _ := http.NewRequest(r.Method, target, io.NopCloser(strings.NewReader(string(body))))
+	req.Header = r.Header
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		jsonError(w, "proxy error: "+err.Error(), 502)
+		return
+	}
+	defer resp.Body.Close()
+	for k, vs := range resp.Header {
+		for _, v := range vs { w.Header().Add(k, v) }
+	}
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
 func (h *HTTPHandler) ListRegCodes(w http.ResponseWriter, r *http.Request) {
 	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
 	if err != nil {

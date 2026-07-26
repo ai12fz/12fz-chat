@@ -38,7 +38,7 @@
       <tbody>
         <tr v-for="d in devices" :key="d.id">
           <td><span @dblclick="startRename(d)" title="双击改名">{{ d.name }}</span></td>
-          <td><span class="tag" :class="d.status">{{ d.status || 'unknown' }}</span></td>
+          <td><span class="status-dot" :class="d.status" :title="d.status"></span> {{ d.status === 'online' ? '在线' : d.status === 'offline' ? '离线' : (d.status || '未知') }}</td>
           <td><code>{{ (d.token||'').slice(0, 12) }}...</code></td>
           <td>{{ d.os || '—' }}</td>
           <td>{{ fmt(d.last_seen) }}</td>
@@ -93,7 +93,14 @@ async function revokeCode(code: string) {
 }
 
 function copyText(t: string) {
-  navigator.clipboard.writeText(t).catch(function(){})
+  var ta = document.createElement('textarea')
+  ta.value = t
+  ta.style.position = 'fixed'
+  ta.style.left = '-9999px'
+  document.body.appendChild(ta)
+  ta.select()
+  try { document.execCommand('copy'); alert('已复制') } catch(e) { prompt('请手动复制：', t) }
+  document.body.removeChild(ta)
 }
 
 async function startRename(d: any) {
@@ -115,6 +122,12 @@ function fmt(t: string) {
 </script>
 
 <style scoped>
+.status-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%%; margin-right: 6px; vertical-align: middle;
+}
+.status-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.status-dot.offline { background: #ef4444; }
+.status-dot:not(.online):not(.offline) { background: #9ca3af; }
 .admin-devices { padding: 20px; }
 .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .admin-nav { display: flex; gap: 12px; }

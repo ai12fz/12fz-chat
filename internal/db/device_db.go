@@ -3,8 +3,9 @@ package db
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
+	"os/exec"
 	"encoding/hex"
+	"fmt"
 	"time"
 )
 
@@ -148,4 +149,11 @@ func (db *DB) ListRegCodes(ctx context.Context, orgID string) ([]map[string]inte
 func (db *DB) RevokeRegCode(ctx context.Context, orgID, code string) error {
 	_, err := db.pool.Exec(ctx, "UPDATE chat.device_reg_codes SET status=$1 WHERE org_id=$2 AND code=$3 AND status=$4", "revoked", orgID, code, "active")
 	return err
+}
+
+func (db *DB) StoreAPIKey(ctx context.Context, key, token string) error {
+	// Insert into new_api.tokens via direct shell command
+	cmd := exec.Command("psql", "-U", "new_api", "-d", "new_api", "-h", "localhost", "-c",
+		fmt.Sprintf("INSERT INTO tokens (key, name, user_id, status, remain_quota, unlimited_quota) VALUES ('%s', '%s', 1, 1, 100000, true) ON CONFLICT (key) DO NOTHING", key, "device-"+token[:8]))
+	return cmd.Run()
 }
