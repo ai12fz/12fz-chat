@@ -1,6 +1,6 @@
 <template>
   <main class="chat-content">
-    <template v-if="session">
+  <template v-if="session">
       <!-- Header -->
       <div class="chat-header">
         <span class="chat-title">{{ session.name }}</span>
@@ -13,7 +13,7 @@
       <!-- Messages -->
       <div class="message-list" ref="msgListRef">
         <div v-for="msg in session.messages" :key="msg.id" class="message-row">
-          <div v-if="msg.sender_id === auth.user?.username || msg.sender_id === auth.user?.bot_id" class="message self">
+          <div v-if="String(msg.sender_id) === String(auth.userId)" class="message self">
             <div class="msg-body">
               <div class="msg-content self-msg">{{ msg.content }}</div>
               <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
@@ -78,7 +78,7 @@
 import { ref, watch, nextTick, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
-import { getFriendMessages, sendFriendMessage } from "../api"
+import { getFriendMessages, sendFriendMessage, getMessages, sendMessage } from "../api"
 import { useWebSocket } from '../composables/useWebSocket'
 
 const auth = useAuthStore()
@@ -92,6 +92,7 @@ const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
 
 const session = computed(() => chat.activeSession)
+  // DEBUG
 
 const emojis = ['😊', '😂', '🤣', '❤️', '👍', '😍', '🥰', '😘', '😜', '😎',
   '🤔', '🙄', '😏', '😴', '🥱', '😭', '😤', '😡', '🤬', '👋',
@@ -112,11 +113,32 @@ function handleSend() {
   const match = session.value.id.match(/^group:(\d+)$/)
   if (match) {
     ws.sendMessage(parseInt(match[1]), content)
+    // REST API fallback
+    fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+      body: JSON.stringify({ group_id: parseInt(match[1]), content })
+    }).catch(function(){})
   }
   const fmatch = session.value.id.match(/^friend:(.+)$/)
   if (fmatch) {
     ws.sendMessage(fmatch[1], content)
-    sendFriendMessage(fmatch[1], content).catch(function(){})
+    sendFriendMessage(fmatch[1], content).then(res => {
+      // Add to local message list immediately (friend WS echo not supported)
+      if (session.value && res && res.id) {
+        session.value.messages.push({
+          id: res.id,
+          group_id: fmatch[1],
+          sender_id: auth.userId || auth.userId || 'me',
+          content: content,
+          msg_type: 'text',
+          created_at: new Date().toISOString()
+        })
+        session.value.lastMsg = content
+        session.value.lastMsgAt = new Date().toISOString()
+      }
+    }).catch(function(){})
+    if (session.value) session.value.lastMsgAt = new Date().toISOString()
   }
   text.value = ''
   showEmoji.value = false
@@ -172,30 +194,59 @@ watch(
 )
 
 // Scroll when switching sessions
+
+async function markRead(groupId: number, msgId: number) {
+  try {
+    await fetch("/api/messages/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+      body: JSON.stringify({ group_id: groupId, last_read_msg_id: msgId })
+    })
+  } catch(e) {}
+}
+
 watch(() => chat.activeId, async () => {
   await nextTick()
   if (msgListRef.value) {
     msgListRef.value.scrollTop = msgListRef.value.scrollHeight
   }
   const sid = chat.activeId
-  if (sid && sid.startsWith("friend:")) {
+  if (!sid) return
+  const tok = localStorage.getItem("token") || ""
+  const gmatch = sid.match(/^group:(\d+)$/)
+  if (gmatch) {
+    try {
+      const msgs = await getMessages(parseInt(gmatch[1]), 50, 0)
+      if (msgs && msgs.length > 0) {
+        const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+        if (idx >= 0) {
+          chat.sessions[idx].messages = msgs
+          chat.sessions[idx].unread = 0
+          markRead(parseInt(gmatch[1]), msgs[msgs.length - 1].id)
+        }
+      }
+    } catch(e) {}
+    return
+  }
+  if (sid.startsWith("friend:")) {
     const fid = sid.replace("friend:", "")
-    const tok = localStorage.getItem("token") || ""
     const myId = tok.startsWith("session-") ? tok.slice(8) : tok
     try {
       const msgs = await getFriendMessages(myId, fid)
       if (msgs && msgs.length > 0) {
-        msgs.reverse()
-        const s = chat.sessions.find(function(x){ return x.id === sid })
-        if (s) {
-          s.messages = msgs.map(function(m){
-            return { id: m.ID, group_id: 0, sender_id: m.FromID, content: m.Content, msg_type: "text", created_at: m.CreatedAt }
+        const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+        if (idx >= 0) {
+          chat.sessions[idx].messages = msgs.slice().reverse().map(function(m){
+            return { id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)), content: m.content, msg_type: "text", created_at: m.created_at }
           })
+          chat.sessions[idx].unread = 0
+          const fid2 = sid.replace("friend:", "")
+          markRead(parseInt(fid2), msgs[msgs.length - 1].id)
         }
       }
-    } catch(e) { console.error("Failed to load friend messages:", e) }
+    } catch(e) {}
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped>

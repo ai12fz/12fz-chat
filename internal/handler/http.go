@@ -89,7 +89,7 @@ func (h *HTTPHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	botID := getBotID(r)
-	group, err := h.db.CreateGroup(r.Context(), req.Name, botID)
+	group, err := h.db.CreateGroup(r.Context(), req.Name, func() int64 { id, _ := strconv.ParseInt(botID, 10, 64); return id }())
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -243,7 +243,7 @@ func (h *HTTPHandler) broadcastMessage(m *db.MessageResult) {
 
 	var botIDs []string
 	for _, member := range members {
-		botIDs = append(botIDs, member.BotID)
+		botIDs = append(botIDs, strconv.FormatInt(member.UserID, 10))
 	}
 	h.hub.SendToGroup(m.GroupID, data, botIDs)
 }
@@ -306,6 +306,41 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, friends, 200)
+}
+
+// ── WhoAmI ──
+
+func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	id, _ := strconv.ParseInt(botID, 10, 64)
+	log.Printf("[whoami] botID=%s id=%d", botID, id)
+	orgUser, err := h.db.GetOrgUserByID(r.Context(), id)
+	log.Printf("[whoami] err=%v user=%+v", err, orgUser)
+	if err == nil {
+		jsonResp(w, map[string]interface{}{"user_id": orgUser.UserID, "nickname": orgUser.Nickname, "phone": orgUser.Phone}, 200)
+		return
+	}
+	jsonResp(w, map[string]interface{}{"user_id": 0, "nickname": botID}, 200)
+}
+
+
+func (h *HTTPHandler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user id", 400)
+		return
+	}
+	orgUser, err := h.db.GetOrgUserByID(r.Context(), userID)
+	if err != nil {
+		jsonError(w, "user not found", 404)
+		return
+	}
+	jsonResp(w, map[string]interface{}{
+		"user_id":  orgUser.UserID,
+		"nickname": orgUser.Nickname,
+		"phone":    orgUser.Phone,
+	}, 200)
 }
 
 // ── Health ──
@@ -388,4 +423,198 @@ func (h *HTTPHandler) HandleFriendRequest(w http.ResponseWriter, r *http.Request
 
 func (h *HTTPHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, []map[string]string{{"count": strconv.Itoa(h.hub.ConnectionCount())}}, 200)
+}
+
+// GetAgentStatus returns agent/bot current status
+func (h *HTTPHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
+	botID := r.URL.Query().Get("bot_id")
+	if botID == "" {
+		w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]string{"error": "bot_id required"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	status, err := h.db.GetBotStatus(ctx, botID)
+	if err != nil {
+		log.Printf("[http] get agent status error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(map[string]string{"error": "internal"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+// ── Agent CRUD ──
+
+func (h *HTTPHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
+	mid := r.Header.Get("X-Merchant-ID")
+	agents, err := h.db.ListAgents(r.Context(), mid)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, agents, 200)
+}
+
+func (h *HTTPHandler) GetAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	agent, err := h.db.GetAgent(r.Context(), botID)
+	if err != nil {
+		jsonError(w, "not found", 404)
+		return
+	}
+	jsonResp(w, agent, 200)
+}
+
+func (h *HTTPHandler) CreateAgent(w http.ResponseWriter, r *http.Request) {
+	var a db.Agent
+	if err := json.NewDecoder(r.Body).Decode(&a); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if a.BotID == "" || a.DisplayName == "" {
+		jsonError(w, "bot_id and display_name required", 400)
+		return
+	}
+	if a.Status == "" {
+		a.Status = "active"
+	}
+	if a.MerchantID == "" {
+		a.MerchantID = r.Header.Get("X-Merchant-ID")
+	}
+	if a.Model == "" {
+		a.Model = "gpt-4"
+	}
+	if err := h.db.CreateAgent(r.Context(), &a); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, a, 201)
+}
+
+func (h *HTTPHandler) UpdateAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	var a db.Agent
+	if err := json.NewDecoder(r.Body).Decode(&a); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if err := h.db.UpdateAgent(r.Context(), botID, &a); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+func (h *HTTPHandler) DeleteAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	if err := h.db.DeleteAgent(r.Context(), botID); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+// Agent Group Bindings
+
+func (h *HTTPHandler) AgentGroups(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	groups, err := h.db.GetGroupsForBot(r.Context(), botID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, groups, 200)
+}
+
+func (h *HTTPHandler) SetAgentGroups(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	var req struct {
+		GroupIDs []int64 `json:"group_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if err := h.db.SetBotGroups(r.Context(), botID, req.GroupIDs); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+
+func (h *HTTPHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name      string `json:"name"`
+		DeviceKey string `json:"device_key"`
+		OS        string `json:"os"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.DeviceKey == "" {
+		jsonError(w, "name and device_key required", 400)
+		return
+	}
+	dev, err := h.db.RegisterDevice(r.Context(), req.Name, req.DeviceKey, req.OS)
+	if err != nil {
+		jsonError(w, "invalid device_key or registration failed: "+err.Error(), 400)
+		return
+	}
+	jsonResp(w, dev, 201)
+}
+
+func (h *HTTPHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	uid, err := strconv.ParseInt(botID, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user", 400)
+		return
+	}
+	orgID, err := h.db.GetOrgID(r.Context(), uid)
+	if err != nil {
+		jsonError(w, "org not found", 400)
+		return
+	}
+	devs, err := h.db.ListDevicesByOrg(r.Context(), orgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	key, _ := h.db.GetDeviceKeyByOrg(r.Context(), orgID)
+	jsonResp(w, map[string]interface{}{"devices": devs, "device_key": key}, 200)
+}
+
+func (h *HTTPHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	if err := h.db.DeleteDevice(r.Context(), id); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "deleted"}, 200)
+}
+
+func (h *HTTPHandler) DeviceAgents(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		jsonError(w, "token required", 401)
+		return
+	}
+	dev, err := h.db.ValidateDeviceToken(r.Context(), token)
+	if err != nil {
+		jsonError(w, "invalid token", 401)
+		return
+	}
+	agents, err := h.db.PendingAgentsByOrg(r.Context(), dev.OrgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, agents, 200)
 }

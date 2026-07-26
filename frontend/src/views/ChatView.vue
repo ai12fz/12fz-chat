@@ -12,7 +12,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { useWebSocket } from '../composables/useWebSocket'
-import { getMyGroups, getUnreadCounts } from '../api'
+import { getMyGroups, getMessages } from '../api'
 import SidebarLeft from '../components/SidebarLeft.vue'
 import ChatContent from '../components/ChatContent.vue'
 import SidebarRight from '../components/SidebarRight.vue'
@@ -44,16 +44,21 @@ onMounted(async () => {
       if (!firstId) firstId = chat.groupSessionId(g.id)
     })
 
-    // Load unread counts
-    try {
-      const unreads = await getUnreadCounts()
-      for (const [groupIdStr, count] of Object.entries(unreads)) {
-        const sid = chat.groupSessionId(Number(groupIdStr))
-        const s = chat.sessions.find(s => s.id === sid)
-        if (s) s.unread = count as number
-      }
-    } catch { /* unread endpoint may not have data */ }
-
+    // Load messages for all groups immediately
+    for (const g of groups) {
+      try {
+        const sid = chat.groupSessionId(g.id)
+        const msgs = await getMessages(g.id, 50, 0)
+        if (msgs && msgs.length > 0) {
+          const sessionMsgs = msgs
+          const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
+          if (idx >= 0) {
+            chat.sessions[idx].messages = sessionMsgs
+            chat.sessions[idx].unread = 0
+          }
+        }
+      } catch(e) { console.error("load error:", e) }
+    }
     // Select first session
     if (firstId) chat.setActive(firstId)
   } catch (err) {

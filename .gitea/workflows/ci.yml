@@ -1,0 +1,33 @@
+name: Deploy Chat
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-chat-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Pull & build chat frontend
+        run: |
+          cd /tmp/ai-chat
+          git fetch origin --depth=1
+          git reset --hard origin/main || { cd /tmp && rm -rf ai-chat && git clone --depth=1 https://gong3:gong31234fz@go.12fz.com/git/qiu/ai-chat.git ai-chat && cd /tmp/ai-chat; }
+          cd frontend && npm install && npx vite build --base /chat/
+          echo "Frontend built OK"
+
+      - name: Deploy to nginx
+        run: |
+          rm -rf /var/www/ai-gateway/chat/*
+          cp -r /tmp/ai-chat/frontend/dist/* /var/www/ai-gateway/chat/
+          echo "Deploy OK"
+
+      - name: Post-deploy
+        run: |
+          cd /var/www/ai-gateway/chat
+          ls -la index.html
+          echo "Deployed at $(date)"

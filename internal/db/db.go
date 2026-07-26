@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/ai12fz/12fz-chat/internal/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DB struct {
 	pool *pgxpool.Pool
+	platformPool *pgxpool.Pool
 }
 
 func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
@@ -27,12 +29,64 @@ func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
 	return &DB{pool: pool}, nil
 }
 
+func ConnectBoth(chatDSN, platformDSN string) (*DB, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, chatDSN)
+	if err != nil { return nil, fmt.Errorf("chat db: %w", err) }
+	if err := pool.Ping(ctx); err != nil { return nil, fmt.Errorf("chat ping: %w", err) }
+
+	platformPool, err := pgxpool.New(ctx, platformDSN)
+	if err != nil { pool.Close(); return nil, fmt.Errorf("zt db: %w", err) }
+	if err := platformPool.Ping(ctx); err != nil { pool.Close(); platformPool.Close(); return nil, fmt.Errorf("zt ping: %w", err) }
+
+	return &DB{pool: pool, platformPool: platformPool}, nil
+}
+
+
+
 func NewFromPool(pool *pgxpool.Pool) *DB {
 	return &DB{pool: pool}
 }
 
 func (d *DB) Close() {
 	d.pool.Close()
+}
+
+
+type OrgUser struct {
+	UserID   int64  `json:"user_id"`
+	Nickname string `json:"nickname"`
+	Phone    string `json:"phone"`
+	Email    string `json:"email"`
+	Status   string `json:"status"`
+}
+
+func (d *DB) GetOrgUserByID(ctx context.Context, userID int64) (*OrgUser, error) {
+
+	var u OrgUser
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT user_id, nickname, phone, COALESCE(email, ''), status FROM org_user WHERE user_id = $1",
+		userID,
+	).Scan(&u.UserID, &u.Nickname, &u.Phone, &u.Email, &u.Status)
+	return &u, err
+}
+
+func (d *DB) GetOrgID(ctx context.Context, userID int64) (string, error) {
+	var orgID string
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT org_id::text FROM org_user WHERE user_id = $1", userID).Scan(&orgID)
+	return orgID, err
+}
+
+func (d *DB) GetOrgUserForLogin(ctx context.Context, account, password string) (*OrgUser, error) {
+	var u OrgUser
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT user_id, COALESCE(nickname, '') FROM org_user WHERE (nickname = $1 OR phone = $1) AND password = $2",
+		account, password,
+	).Scan(&u.UserID, &u.Nickname)
+	return &u, err
 }
 
 func (d *DB) AutoMigrate(ctx context.Context) error {
@@ -49,11 +103,11 @@ func (d *DB) AutoMigrate(ctx context.Context) error {
 
 		"CREATE TABLE IF NOT EXISTS chat.group_members (" +
 			"group_id INT REFERENCES chat.groups(id) ON DELETE CASCADE," +
-			"bot_id TEXT NOT NULL," +
+			"user_id BIGINT NOT NULL," +
 			"role TEXT DEFAULT 'member'," +
 			"joined_at TIMESTAMPTZ DEFAULT NOW()," +
 			"last_read_msg_id INT DEFAULT 0," +
-			"PRIMARY KEY (group_id, bot_id)" +
+			"PRIMARY KEY (group_id, user_id)" +
 			")",
 
 		"CREATE TABLE IF NOT EXISTS chat.messages (" +
@@ -145,10 +199,12 @@ func (d *DB) GetMessages(ctx context.Context, groupID int64, limit, offset int) 
 
 type GroupWithMeta struct {
 	model.Group
-	LastMsgAt time.Time `json:"last_msg_at"`
+	LastMsgAt     time.Time `json:"last_msg_at"`
+	LastReadMsgID int64     `json:"last_read_msg_id"`
+	Unread        int       `json:"unread"`
 }
 
-func (d *DB) CreateGroup(ctx context.Context, name, createdBy string) (*model.Group, error) {
+func (d *DB) CreateGroup(ctx context.Context, name string, createdBy int64) (*model.Group, error) {
 	g := &model.Group{Name: name, CreatedBy: createdBy}
 	err := d.pool.QueryRow(ctx,
 		"INSERT INTO chat.groups (name, created_by) VALUES ($1, $2) RETURNING id, created_at",
@@ -167,7 +223,7 @@ func (d *DB) ListGroups(ctx context.Context) ([]GroupWithMeta, error) {
 	var groups []GroupWithMeta
 	for rows.Next() {
 		var g GroupWithMeta
-		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt, &g.LastReadMsgID, &g.Unread); err != nil {
 			return nil, err
 		}
 		groups = append(groups, g)
@@ -178,10 +234,12 @@ func (d *DB) ListGroups(ctx context.Context) ([]GroupWithMeta, error) {
 // ListGroupsForUser returns groups the user is a member of, sorted by last_msg_at DESC
 func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMeta, error) {
 	rows, err := d.pool.Query(ctx,
-		`SELECT g.id, g.name, g.created_by, g.created_at, g.last_msg_at
+		`SELECT g.id, g.name, g.created_by, g.created_at, g.last_msg_at,
+		       m.last_read_msg_id,
+		       (SELECT COUNT(*) FROM chat.messages WHERE group_id = g.id AND id > COALESCE(m.last_read_msg_id, 0)) as unread
 		 FROM chat.groups g
 		 JOIN chat.group_members m ON m.group_id = g.id
-		 WHERE m.bot_id = $1
+		 WHERE m.user_id = $1
 		 ORDER BY g.last_msg_at DESC`, botID)
 	if err != nil {
 		return nil, err
@@ -190,7 +248,7 @@ func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMe
 	var groups []GroupWithMeta
 	for rows.Next() {
 		var g GroupWithMeta
-		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedBy, &g.CreatedAt, &g.LastMsgAt, &g.LastReadMsgID, &g.Unread); err != nil {
 			return nil, err
 		}
 		groups = append(groups, g)
@@ -200,14 +258,14 @@ func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMe
 
 func (d *DB) AddMember(ctx context.Context, groupID int64, botID, role string) error {
 	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.group_members (group_id, bot_id, role) VALUES ($1, $2, $3) ON CONFLICT (group_id, bot_id) DO UPDATE SET role = $3",
+		"INSERT INTO chat.group_members (group_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (group_id, user_id) DO UPDATE SET role = $3",
 		groupID, botID, role)
 	return err
 }
 
 func (d *DB) GetMembers(ctx context.Context, groupID int64) ([]model.GroupMember, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT group_id, bot_id, role, joined_at FROM chat.group_members WHERE group_id = $1",
+		"SELECT group_id, user_id, role, joined_at FROM chat.group_members WHERE group_id = $1",
 		groupID)
 	if err != nil {
 		return nil, err
@@ -216,7 +274,7 @@ func (d *DB) GetMembers(ctx context.Context, groupID int64) ([]model.GroupMember
 	var members []model.GroupMember
 	for rows.Next() {
 		var m model.GroupMember
-		if err := rows.Scan(&m.GroupID, &m.BotID, &m.Role, &m.JoinedAt); err != nil {
+		if err := rows.Scan(&m.GroupID, &m.UserID, &m.Role, &m.JoinedAt); err != nil {
 			return nil, err
 		}
 		members = append(members, m)
@@ -238,7 +296,7 @@ func (d *DB) UpdateGroupLastMsg(ctx context.Context, groupID int64) error {
 // UpdateLastRead updates the last_read_msg_id for a member in a group
 func (d *DB) UpdateLastRead(ctx context.Context, groupID int64, botID string, msgID int64) error {
 	_, err := d.pool.Exec(ctx,
-		"UPDATE chat.group_members SET last_read_msg_id = $1 WHERE group_id = $2 AND bot_id = $3",
+		"UPDATE chat.group_members SET last_read_msg_id = $1 WHERE group_id = $2 AND user_id = $3",
 		msgID, groupID, botID)
 	return err
 }
@@ -250,7 +308,7 @@ func (d *DB) GetUnreadCount(ctx context.Context, groupID int64, botID string) (i
 		`SELECT COALESCE(COUNT(*), 0) FROM chat.messages m
 		 WHERE m.group_id = $1 AND m.id > (
 		   SELECT COALESCE(gm.last_read_msg_id, 0) FROM chat.group_members gm
-		   WHERE gm.group_id = $1 AND gm.bot_id = $2
+		   WHERE gm.group_id = $1 AND gm.user_id = $2
 		 )`,
 		groupID, botID).Scan(&count)
 	return count, err
@@ -261,7 +319,7 @@ func (d *DB) GetUnreadCountForUser(ctx context.Context, botID string) (map[int64
 	rows, err := d.pool.Query(ctx,
 		`SELECT m.group_id, COUNT(*) AS unread
 		 FROM chat.messages m
-		 JOIN chat.group_members gm ON gm.group_id = m.group_id AND gm.bot_id = $1
+		 JOIN chat.group_members gm ON gm.group_id = m.group_id AND gm.user_id = $1
 		 WHERE m.id > COALESCE(gm.last_read_msg_id, 0)
 		 GROUP BY m.group_id`, botID)
 	if err != nil {
@@ -365,4 +423,37 @@ func (d *DB) DeleteFriend(ctx context.Context, userID, friendID string) error {
 		"DELETE FROM chat.friends WHERE user_id=$1 AND friend_id=$2",
 		userID, friendID)
 	return err
+}
+
+
+// GetBotStatus returns the current status of a bot/agent
+func (d *DB) GetBotStatus(ctx context.Context, botID string) (map[string]interface{}, error) {
+	sql := `SELECT bot_id, status, COALESCE(current_task_id, ''), COALESCE(current_task_title, ''), COALESCE(message, ''), heartbeat_at, updated_at FROM chat.bot_statuses WHERE bot_id=$1`
+	row := d.pool.QueryRow(ctx, sql, botID)
+	var id, status, taskID, taskTitle, msg string
+	var heartbeat, updated time.Time
+	err := row.Scan(&id, &status, &taskID, &taskTitle, &msg, &heartbeat, &updated)
+	if err == pgx.ErrNoRows {
+		return map[string]interface{}{
+			"bot_id": botID,
+			"status": "offline",
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]interface{}{
+		"bot_id":             id,
+		"status":             status,
+		"heartbeat_at":       heartbeat.Format(time.RFC3339),
+		"updated_at":         updated.Format(time.RFC3339),
+	}
+	if taskID != "" {
+		result["current_task_id"] = taskID
+		result["current_task_title"] = taskTitle
+	}
+	if msg != "" {
+		result["message"] = msg
+	}
+	return result, nil
 }
