@@ -185,13 +185,27 @@ except Exception as ex:
     print(f"sync err: {ex}", flush=True)
 
 # Connect WebSocket and listen for messages
-lhb = time.time()
+start_time = time.time()
+def keepalive():
+    while True:
+        import threading,time
+        time.sleep(30)
+        curl("POST","/api/devices/heartbeat",{})
+threading.Thread(target=keepalive,daemon=True).start()
+lhb = start_time
 while True:
     try:
         ws = ws_connect(T)
         print("ws connected", flush=True)
         curl("POST","/api/devices/heartbeat",{})
-        lhb = time.time()
+        start_time = time.time()
+def keepalive():
+    while True:
+        import threading,time
+        time.sleep(30)
+        curl("POST","/api/devices/heartbeat",{})
+threading.Thread(target=keepalive,daemon=True).start()
+lhb = start_time
         
         while True:
             data = ws_recv(ws)
@@ -213,7 +227,14 @@ while True:
             # Heartbeat
             if time.time() - lhb > 30:
                 curl("POST","/api/devices/heartbeat",{})
-                lhb = time.time()
+                start_time = time.time()
+def keepalive():
+    while True:
+        import threading,time
+        time.sleep(30)
+        curl("POST","/api/devices/heartbeat",{})
+threading.Thread(target=keepalive,daemon=True).start()
+lhb = start_time
                 
     except Exception as e:
         print("ws err: "+str(e)[:80]+", reconnect in 5s", flush=True)
