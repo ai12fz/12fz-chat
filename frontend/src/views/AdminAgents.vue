@@ -118,6 +118,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+async function request(url: string, opts: any = {}) {
+  const token = localStorage.token || 'session-1'
+  opts.headers = { ...opts.headers, Authorization: 'Bearer ' + token }
+  const r = await fetch(url, opts)
+  return r.json()
+}
+
 import api from '../api'
 
 const agents = ref<any[]>([])
