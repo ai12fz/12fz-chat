@@ -5,7 +5,7 @@ echo "Starting 12fzclaw (push)..."
 python3 -u > "$P/bot.log" 2>&1 << 'PYEOF'
 #!/usr/bin/env python3
 """Minimal WebSocket client - no dependencies, push mode for 12fzclaw"""
-import json,os,time,subprocess,socket,ssl,hashlib,base64,struct,threading
+import json,os,time,subprocess,socket,ssl,hashlib,base64,struct,threading,threading
 
 P=os.path.expanduser("~/.12fzclaw")
 T=open(P+"/device-token").read().strip()
@@ -185,6 +185,14 @@ except Exception as ex:
     print(f"sync err: {ex}", flush=True)
 
 # Connect WebSocket and listen for messages
+def hb_loop():
+    while True:
+        time.sleep(30)
+        try:
+            curl("POST","/api/devices/heartbeat",{})
+        except:
+            pass
+threading.Thread(target=hb_loop, daemon=True).start()
 lhb = time.time()
 while True:
     try:
