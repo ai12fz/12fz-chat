@@ -5,7 +5,7 @@ echo "Starting 12fzclaw (push)..."
 python3 -u > "$P/bot.log" 2>&1 << 'PYEOF'
 #!/usr/bin/env python3
 """Minimal WebSocket client - no dependencies, push mode for 12fzclaw"""
-import json,os,time,subprocess,socket,ssl,hashlib,base64,struct
+import json,os,time,subprocess,socket,ssl,hashlib,base64,struct,threading
 
 P=os.path.expanduser("~/.12fzclaw")
 T=open(P+"/device-token").read().strip()
@@ -185,27 +185,13 @@ except Exception as ex:
     print(f"sync err: {ex}", flush=True)
 
 # Connect WebSocket and listen for messages
-start_time = time.time()
-def keepalive():
-    while True:
-        import threading,time
-        time.sleep(30)
-        curl("POST","/api/devices/heartbeat",{})
-threading.Thread(target=keepalive,daemon=True).start()
-lhb = start_time
+lhb = time.time()
 while True:
     try:
         ws = ws_connect(T)
         print("ws connected", flush=True)
         curl("POST","/api/devices/heartbeat",{})
-        start_time = time.time()
-def keepalive():
-    while True:
-        import threading,time
-        time.sleep(30)
-        curl("POST","/api/devices/heartbeat",{})
-threading.Thread(target=keepalive,daemon=True).start()
-lhb = start_time
+        lhb = time.time()
         
         while True:
             data = ws_recv(ws)
@@ -227,14 +213,7 @@ lhb = start_time
             # Heartbeat
             if time.time() - lhb > 30:
                 curl("POST","/api/devices/heartbeat",{})
-                start_time = time.time()
-def keepalive():
-    while True:
-        import threading,time
-        time.sleep(30)
-        curl("POST","/api/devices/heartbeat",{})
-threading.Thread(target=keepalive,daemon=True).start()
-lhb = start_time
+                lhb = time.time()
                 
     except Exception as e:
         print("ws err: "+str(e)[:80]+", reconnect in 5s", flush=True)
