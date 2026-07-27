@@ -123,13 +123,7 @@ func (h *Hub) SendToBot(botID string, data []byte) {
 		default:
 		}
 	}
-	chatID := botID + ":chat"
-	if c, ok := h.clients[chatID]; ok {
-		select {
-		case c.send <- data:
-		default:
-		}
-	}
+
 }
 
 func (h *Hub) SendToGroup(groupID int64, data []byte, dbGroupMembers []string) {
