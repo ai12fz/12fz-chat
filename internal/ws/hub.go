@@ -118,10 +118,14 @@ func (h *Hub) SendToBot(botID string, data []byte) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	if c, ok := h.clients[botID]; ok {
+		log.Printf("[sendtobot] found %s in hub, pushing", botID)
 		select {
 		case c.send <- data:
 		default:
+			log.Printf("[sendtobot] %s channel full, dropped", botID)
 		}
+	} else {
+		log.Printf("[sendtobot] %s NOT in hub", botID)
 	}
 
 }
