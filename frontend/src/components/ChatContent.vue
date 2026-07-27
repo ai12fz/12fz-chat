@@ -254,12 +254,13 @@ watch(() => chat.activeId, async () => {
         if (msgs2 && msgs2.length > 0) {
           const idx2 = chat.sessions.findIndex(x => x.id === sid)
           if (idx2 >= 0) {
-            const oldLen = chat.sessions[idx2].messages.length
+            const oldMsgs = chat.sessions[idx2].messages
             const newMsgs = msgs2.slice().reverse().map(m => ({
               id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)),
               content: m.content, msg_type: 'text', created_at: m.created_at
             }))
-            if (newMsgs.length > oldLen) {
+            const hasNew = !oldMsgs.length || newMsgs.length > oldMsgs.length || newMsgs[newMsgs.length-1]?.id !== oldMsgs[oldMsgs.length-1]?.id
+            if (hasNew) {
               chat.sessions[idx2].messages = newMsgs
               chat.sessions[idx2].lastMsg = msgs2[msgs2.length-1].content
               chat.sessions[idx2].lastMsgAt = msgs2[msgs2.length-1].created_at
@@ -271,28 +272,7 @@ watch(() => chat.activeId, async () => {
       } catch(e) { /* ignore poll errors */ }
     }, 3000)
     // Cleanup on session change
-    return () => { clearInterval(_ft) }
-    if (sid.startsWith("friend:")) {
-    const fid = sid.replace("friend:", "")
-    const myId = tok.startsWith("session-") ? tok.slice(8) : tok
-    try {
-      const msgs = await getFriendMessages(myId, fid)
-      if (msgs && msgs.length > 0) {
-        const idx = chat.sessions.findIndex(function(x){ return x.id === sid })
-        if (idx >= 0) {
-          chat.sessions[idx].messages = msgs.slice().reverse().map(function(m){
-            return { id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)), content: m.content, msg_type: "text", created_at: m.created_at }
-          })
-          chat.sessions[idx].unread = 0
-          const lastMsg = msgs[msgs.length - 1]
-          if (lastMsg) {
-            chat.sessions[idx].lastMsg = lastMsg.content
-            chat.sessions[idx].lastMsgAt = lastMsg.created_at
-          }
-        }
-      }
-    } catch(e) {}
-  }
+;
 }, { immediate: true })
 </script>
 
