@@ -730,16 +730,27 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 		return
 	}
 	defer resp.Body.Close()
-	// Log usage
-	if err := h.db.LogProxyUsage(context.Background(), "deepseek", 0); err != nil {
-		log.Printf("[proxy] usage log err: %v", err)
+
+	// Read response to extract actual model name and token count
+	respBody, _ := io.ReadAll(resp.Body)
+	var parsed struct {
+		Usage struct {
+			TotalTokens int `json:"total_tokens"`
+		} `json:"usage"`
+		ModelNm string `json:"model"`
 	}
-	h.db.LogProxyUsage(context.Background(), "deepseek", 0)
+	json.Unmarshal(respBody, &parsed)
+	modelName := parsed.ModelNm
+	if modelName == "" { modelName = "deepseek" }
+	tokenCount := parsed.Usage.TotalTokens
+
+	go h.db.LogProxyUsage(context.Background(), modelName, tokenCount)
+
 	for k, vs := range resp.Header {
 		for _, v := range vs { w.Header().Add(k, v) }
 	}
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	w.Write(respBody)
 }
 func (h *HTTPHandler) ListRegCodes(w http.ResponseWriter, r *http.Request) {
 	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
