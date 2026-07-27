@@ -11,7 +11,6 @@
     <div class="tab-bar">
       <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
       <div class="tab" :class="{ active: activeTab === 'friends' }" @click="activeTab = 'friends'">好友</div>
-      <div class="tab" :class="{ active: activeTab === 'agent' }" @click="activeTab = 'agent'">Agent</div>
     </div>
 
     <div class="tab-content" v-show="activeTab === 'msg'">
@@ -37,30 +36,11 @@
       </nav>
     </div>
 
-    
-    <div class="tab-content" v-show="activeTab === 'agent'">
-      <div class="category-filter">
-        <button :class="{ active: agentCat === '' }" @click="agentCat = ''">全部</button>
-        <button v-for="cat in agentCategories" :key="cat" :class="{ active: agentCat === cat }" @click="agentCat = cat">{{ cat }}</button>
-      </div>
-      <nav class="session-list">
-        <div v-for="f in filteredAgentFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
-          <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
-          <div class="session-info">
-            <div class="session-top">
-              <span class="session-name">{{ f.friend_id }}</span>
-              <span class="session-badge badge-agent">🤖 {{ f.category || "日常" }}</span>
-            </div>
-            <span class="session-msg">{{ f.status || '暂无消息' }}</span>
-          </div>
-        </div>
-        <div v-if="filteredAgentFriends.length === 0" class="empty-hint">{{ agentCat ? agentCat + '分类下暂无' : '暂无 Agent' }}</div>
-      </nav>
-    </div>
+
 
 <div class="tab-content" v-show="activeTab === 'friends'">
       <nav class="session-list">
-        <div v-for="f in nonAgentFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
+        <div v-for="f in friends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
           <div class="session-info">
             <div class="session-top">
@@ -72,7 +52,7 @@
             <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>
         </div>
-        <div v-if="nonAgentFriends.length === 0" class="empty-hint">暂无好友</div>
+        <div v-if="friends.length === 0" class="empty-hint">暂无好友</div>
       </nav>
       <div class="add-friend-bar">
         <div class="session-item" @click="showAddFriend = true">
@@ -116,11 +96,7 @@ const search = ref('')
 const activeTab = ref('msg')
 
 const friends = ref<any[]>([])
-const agentFriends = computed(() => friends.value.filter(f => f.user_type === 'agent'))
-const agentCategories = computed(() => [...new Set(agentFriends.value.map(f => f.category || '日常'))])
-const agentCat = ref('')
-const filteredAgentFriends = computed(() => agentCat.value ? agentFriends.value.filter(f => (f.category || '日常') === agentCat.value) : agentFriends.value)
-const nonAgentFriends = computed(() => friends.value.filter(f => f.user_type !== 'agent'))
+const nonAgentFriends = computed(() => friends.value)
 const showAddFriend = ref(false)
 const showProfile = ref(false)
 const newNickname = ref('')
