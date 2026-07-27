@@ -358,7 +358,7 @@ func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {
 
 func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, f.created_at FROM chat.friends f LEFT JOIN chat_agents a ON f.friend_id = a.id WHERE f.user_id = $1",
+		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at FROM chat.friends f LEFT JOIN chat_agents a ON f.friend_id = a.id WHERE f.user_id = $1",
 		userID)
 	if err != nil {
 		return nil, err
@@ -426,7 +426,6 @@ func (d *DB) UpdateFriendCategory(ctx context.Context, userID, friendID, categor
 		category, userID, friendID)
 	return err
 }
-
 func (d *DB) UpdateFriendStatus(ctx context.Context, userID, friendID, status string) error {
 	_, err := d.pool.Exec(ctx,
 		"UPDATE chat.friends SET status=$1 WHERE user_id=$2 AND friend_id=$3",
