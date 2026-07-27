@@ -7,12 +7,11 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"fmt"
+	"time"	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"time"
-
 	"github.com/ai12fz/12fz-chat/internal/model"
 	"github.com/ai12fz/12fz-chat/internal/db"
 	"github.com/ai12fz/12fz-chat/internal/ws"
@@ -704,31 +703,59 @@ func (h *HTTPHandler) DeviceSetup(w http.ResponseWriter, r *http.Request) {
 
 // ProxyChat forwards /v1/chat/completions to new-api
 func (h *HTTPHandler) ProxyChat(w http.ResponseWriter, r *http.Request) {
-	h.proxyRequest(w, r, "http://127.0.0.1:3002/v1/chat/completions")
+	h.proxyRequest(w, r, "")
 }
 
 // ProxyModels forwards /v1/models to new-api
 func (h *HTTPHandler) ProxyModels(w http.ResponseWriter, r *http.Request) {
-	h.proxyRequest(w, r, "http://127.0.0.1:3002/v1/models")
+	jsonResp(w, []map[string]interface{}{}, 200)
 }
 
 func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, target string) {
+	start := time.Now()
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
-	req, _ := http.NewRequest(r.Method, target, io.NopCloser(strings.NewReader(string(body))))
+
+	// Parse model from request
+	var reqBody struct {
+		Model    string `json:"model"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	json.Unmarshal(body, &reqBody)
+
+	// Look up model endpoint from DB
+	models, _ := h.db.ProxyListModels(r.Context())
+	var endpoint, apiKey string
+	modelName := reqBody.Model
+	for _, m := range models {
+		if m["name"] == modelName && m["status"] == "active" {
+			if ep, ok := m["endpoint"].(string); ok { endpoint = ep }
+			if k, ok := m["api_key"].(string); ok { apiKey = k }
+			break
+		}
+	}
+	if endpoint == "" {
+		// Fallback: use target if no matching model found
+		endpoint = target
+	}
+
+	req, _ := http.NewRequest(r.Method, endpoint, io.NopCloser(strings.NewReader(string(body))))
 	req.Header = r.Header
-	// Pass through Authorization header (new-api handles auth)
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		jsonError(w, "proxy error: "+err.Error(), 502)
 		return
 	}
 	defer resp.Body.Close()
+	durationMs := int(time.Since(start).Milliseconds())
 
-	// Read response to extract actual model name and token count
 	respBody, _ := io.ReadAll(resp.Body)
 	var parsed struct {
-		ModelNm string `json:"model"`
+		Model string `json:"model"`
 		Usage struct {
 			PromptTokens     int `json:"prompt_tokens"`
 			CompletionTokens int `json:"completion_tokens"`
@@ -739,18 +766,16 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 		} `json:"error"`
 	}
 	json.Unmarshal(respBody, &parsed)
-	modelName := parsed.ModelNm
-	if modelName == "" { modelName = "unknown" }
+	if parsed.Model != "" { modelName = parsed.Model }
 	tokenCount := parsed.Usage.TotalTokens
-	errMsg := parsed.Error.Message
+	if tokenCount == 0 { tokenCount = parsed.Usage.PromptTokens + parsed.Usage.CompletionTokens }
 
-	// Sync log - critical for billing, must not drop. Retry once.
+	// Sync log with retry (billing-critical)
 	for attempt := 0; attempt < 2; attempt++ {
 		err2 := h.db.LogProxyUsage(r.Context(), modelName, tokenCount)
 		if err2 == nil { break }
 		if attempt == 1 {
-			// Fallback: write to local file as last resort
-			log.Printf("[proxy] USAGE LOG FAILED after retry: %v (model=%s tokens=%d err=%s)", err2, modelName, tokenCount, errMsg)
+			log.Printf("[proxy] USAGE LOG FAILED: model=%s tokens=%d err=%v", modelName, tokenCount, err2)
 		} else {
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -761,6 +786,7 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	}
 	w.WriteHeader(resp.StatusCode)
 	w.Write(respBody)
+	log.Printf("[proxy] %s -> %s %dms %dtok", reqBody.Model, modelName, durationMs, tokenCount)
 }
 func (h *HTTPHandler) ListRegCodes(w http.ResponseWriter, r *http.Request) {
 	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
