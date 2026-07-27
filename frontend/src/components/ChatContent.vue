@@ -225,6 +225,28 @@ watch(() => chat.activeId, async () => {
     } catch(e) {}
     return
   }
+  // Friend message handling
+  const fid = sid.replace("friend:", "")
+  const myId = tok.startsWith("session-") ? tok.slice(8) : tok
+
+  // Initial load of friend messages
+  try {
+    const msgs = await getFriendMessages(myId, fid)
+    if (msgs && msgs.length > 0) {
+      const idx = chat.sessions.findIndex(x => x.id === sid)
+      if (idx >= 0) {
+        chat.sessions[idx].messages = msgs.slice().reverse().map(m => ({
+          id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)),
+          content: m.content, msg_type: 'text', created_at: m.created_at
+        }))
+        chat.sessions[idx].lastMsg = msgs[msgs.length-1].content
+        chat.sessions[idx].lastMsgAt = msgs[msgs.length-1].created_at
+        await nextTick()
+        msgListRef.value && (msgListRef.value.scrollTop = msgListRef.value.scrollHeight)
+      }
+    }
+  } catch(e) {}
+
   // Poll for new friend messages every 3s (with cleanup)
     let _ft = setInterval(async () => {
       try {
