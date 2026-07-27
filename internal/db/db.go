@@ -472,3 +472,11 @@ func (d *DB) GetBotStatus(ctx context.Context, botID string) (map[string]interfa
 	}
 	return result, nil
 }
+func (d *DB) SaveSystemMessage(ctx context.Context, userID, content string) (int64, error) {
+	var id int64
+	err := d.pool.QueryRow(ctx,
+		"INSERT INTO chat.friend_messages (from_id, to_id, content, created_at) VALUES ('system', $1, $2, NOW()) RETURNING id",
+		userID, content).Scan(&id)
+	return id, err
+}
+

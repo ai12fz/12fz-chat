@@ -821,6 +821,54 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	w.Write(respBody)
 	log.Printf("[proxy] %s -> %s %dms %dtok", reqBody.Model, modelName, durationMs, tokenCount)
 }
+// SystemNotify sends a notification to a merchant main account
+func (h *HTTPHandler) SystemNotify(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrgID   string `json:"org_id"`
+		Content string `json:"content"`
+		Title   string `json:"title"`
+	}
+	var userID string
+	json.NewDecoder(r.Body).Decode(&req)
+	if req.Content == "" {
+		jsonError(w, "org_id and content required", 400)
+		return
+	}
+	// Skip auth check - this is called from internal services
+	botID := getBotID(r)
+	if botID == "" { botID = "system" }
+
+	// Use org_id as user_id (or default to admin)
+	if req.OrgID != "" { userID = req.OrgID }
+	if userID == "" { userID = "1" }
+	if userID == "00000000-0000-0000-0000-000000000000" {
+		userID = "1" // default admin
+	}
+
+	// Save as system message
+	content := req.Content
+	if req.Title != "" {
+		content = "【" + req.Title + "】" + content
+	}
+	id, err := h.db.SaveSystemMessage(r.Context(), userID, content)
+	if err != nil {
+		jsonError(w, "save failed", 500)
+		return
+	}
+
+	// Push via WebSocket
+	notifyData, _ := json.Marshal(map[string]interface{}{
+		"type": "system_notify",
+		"data": map[string]interface{}{
+			"id": id, "content": content, "title": req.Title,
+		},
+	})
+	h.hub.SendToBot(userID, notifyData)
+
+	jsonResp(w, map[string]interface{}{"status": "ok", "id": id}, 200)
+}
+
+
 func (h *HTTPHandler) ListRegCodes(w http.ResponseWriter, r *http.Request) {
 	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
 	if err != nil {

@@ -49,6 +49,7 @@ func main() {
 
 	// Health check (public)
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
+	r.HandleFunc("/api/system/notify", httpHandler.SystemNotify).Methods("POST")
 	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
 	
 	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
