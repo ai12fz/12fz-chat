@@ -124,6 +124,9 @@ func main() {
 	r.HandleFunc("/api/devices/{id}/toggle-skills", httpHandler.ToggleDeviceSkills).Methods("POST")
 	r.HandleFunc("/api/devices/{id}/toggle-software", httpHandler.ToggleDeviceSoftware).Methods("POST")
 
+	r.HandleFunc("/api/devices/{id}/activity", httpHandler.GetDeviceActivity).Methods("GET")
+	r.HandleFunc("/api/devices/activity", httpHandler.PostDeviceActivity).Methods("POST")
+
 	r.HandleFunc("/api/skills", httpHandler.ListSkills).Methods("GET")
 	r.HandleFunc("/api/skills/{name}", httpHandler.UpdateSkill).Methods("PUT")
 	r.HandleFunc("/api/skills/{name}", httpHandler.DeleteSkill).Methods("DELETE")

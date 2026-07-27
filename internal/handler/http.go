@@ -864,6 +864,24 @@ func (h *HTTPHandler) resolveOrgFromToken(token string) (string, error) {
 	return upstream.Data.UserInfo.OrgID, nil
 }
 
+func (h *HTTPHandler) PostDeviceActivity(w http.ResponseWriter, r *http.Request) {
+	deviceID := getBotID(r)
+	var body struct { Action string `json:"action"`; Detail string `json:"detail"` }
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Action == "" { body.Action = "unknown" }
+	h.db.LogDeviceActivity(r.Context(), deviceID, body.Action, body.Detail)
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+func (h *HTTPHandler) GetDeviceActivity(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" { fmt.Sscanf(l, "%d", &limit) }
+	activity, _ := h.db.GetDeviceActivity(r.Context(), deviceID, limit)
+	if activity == nil { activity = []map[string]interface{}{} }
+	jsonResp(w, activity, 200)
+}
+
 func (h *HTTPHandler) ToggleDeviceSkills(w http.ResponseWriter, r *http.Request) {
 	deviceID := r.PathValue("id")
 	if err := h.db.ToggleDeviceSkills(r.Context(), deviceID); err != nil {

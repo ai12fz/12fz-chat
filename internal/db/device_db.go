@@ -181,3 +181,22 @@ func (db *DB) UpdateDeviceLastSeen(ctx context.Context, deviceID string) error {
 	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW(), status='online' WHERE id=$1", deviceID)
 	return err
 }
+
+func (d *DB) LogDeviceActivity(ctx context.Context, deviceID, action, detail string) error {
+	_, err := d.pool.Exec(ctx, `INSERT INTO chat.device_activity (device_id, action, detail) VALUES ($1, $2, $3)`, deviceID, action, detail)
+	return err
+}
+
+func (d *DB) GetDeviceActivity(ctx context.Context, deviceID string, limit int) ([]map[string]interface{}, error) {
+	rows, err := d.pool.Query(ctx, `SELECT action, detail, created_at FROM chat.device_activity WHERE device_id=$1 ORDER BY created_at DESC LIMIT $2`, deviceID, limit)
+	if err != nil { return nil, err }
+	defer rows.Close()
+	var out []map[string]interface{}
+	for rows.Next() {
+		var action, detail string
+		var ts time.Time
+		rows.Scan(&action, &detail, &ts)
+		out = append(out, map[string]interface{}{"action": action, "detail": detail, "time": ts.Format("15:04:05")})
+	}
+	return out, nil
+}
