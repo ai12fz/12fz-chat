@@ -62,8 +62,8 @@ func (d *DB) GetAgent(ctx context.Context, botID string) (*Agent, error) {
 
 func (d *DB) CreateAgent(ctx context.Context, a *Agent) error {
 	return d.pool.QueryRow(ctx,
-		"INSERT INTO chat.agents (bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at, updated_at",
-		a.BotID, a.DisplayName, a.Model, a.SystemPrompt, a.Capabilities, a.Status, a.APIKey, a.APIURL, a.MerchantID,
+		"INSERT INTO chat.agents (bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, created_at, updated_at",
+		a.BotID, a.DisplayName, a.Model, a.SystemPrompt, a.Category, a.Capabilities, a.Status, a.APIKey, a.APIURL, a.MerchantID,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 }
 
