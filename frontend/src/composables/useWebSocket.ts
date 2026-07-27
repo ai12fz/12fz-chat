@@ -12,7 +12,7 @@ export function useWebSocket() {
     if (ws) disconnect()
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${protocol}//${location.host}/ws?token=${token}:chat`
+    const url = `${protocol}//${location.host}/ws2?token=${token}`
 
     ws = new WebSocket(url)
 

@@ -156,7 +156,7 @@ func main() {
 			return
 		}
 		log.Printf("[chat] WS connect: bot_id=%s", botID)
-		hub.ServeWS(w, r, botID, msgHandler)
+		hub.ServeWSGorilla(w, r, botID, msgHandler)
 	})
 
 	// Serve static frontend
@@ -186,7 +186,7 @@ func main() {
 			return
 		}
 		log.Printf("[chat] WS2 connect: bot_id=%s", botID)
-		hub.ServeWS(w, r, botID, msgHandler)
+		hub.ServeWSGorilla(w, r, botID, msgHandler)
 	})
 	go func() {
 		wsSrv := &http.Server{Addr: ":8082", Handler: middleware.CORS(wsMux)}

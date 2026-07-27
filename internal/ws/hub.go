@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"github.com/gorilla/websocket"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
@@ -293,6 +294,8 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, botID string, hand
 	client.send <- hello
 
 	go client.ReadPumpRaw(handler)
+	// Keep handler alive so http.Server doesn't close the hijacked connection
+	select {}
 	log.Printf("[ws] servews done for %s", botID)
 }
 
@@ -300,4 +303,32 @@ func (h *Hub) ConnectionCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+func (h *Hub) ServeWSGorilla(w http.ResponseWriter, r *http.Request, botID string, msgHandler MessageHandler) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("[ws] upgrade failed for %s: %v", botID, err)
+		return
+	}
+	hello, _ := json.Marshal(WSMessage{
+		Type: "hello",
+		Data: mustJSON(map[string]string{"bot_id": botID, "msg": fmt.Sprintf("Welcome %s to 12FZ Chat", botID)}),
+	})
+	conn.WriteMessage(websocket.TextMessage, hello)
+
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("[ws] read error for %s: %v", botID, err)
+			break
+		}
+		msgHandler.HandleMessage(botID, msg)
+	}
+	conn.Close()
 }

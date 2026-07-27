@@ -29,6 +29,14 @@ func NewAuthHandler(jwtSecret string, botTokens map[string]string, database *db.
 }
 
 func (h *AuthHandler) ValidateToken(token string) (string, error) {
+	// Strip protocol suffix (e.g. session-1:chat -> session-1)
+	if idx := strings.LastIndex(token, ":"); idx > 0 {
+		suffix := token[idx+1:]
+		if suffix == "chat" || suffix == "ws" || suffix == "api" {
+			token = token[:idx]
+		}
+	}
+
 	for botID, botToken := range h.botTokens {
 		if token == botToken {
 			return botID, nil
