@@ -299,6 +299,23 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, botID string, hand
 	log.Printf("[ws] servews done for %s", botID)
 }
 
+// PushToDevice sends a message to a specific connected device
+func (h *Hub) PushToDevice(deviceID string, msg []byte) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for id, client := range h.clients {
+		if id == deviceID {
+			select {
+			case client.send <- msg:
+				return true
+			default:
+				return false
+			}
+		}
+	}
+	return false
+}
+
 func (h *Hub) ConnectionCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -321,6 +338,10 @@ func (h *Hub) ServeWSGorilla(w http.ResponseWriter, r *http.Request, botID strin
 		Data: mustJSON(map[string]string{"bot_id": botID, "msg": fmt.Sprintf("Welcome %s to 12FZ Chat", botID)}),
 	})
 	conn.WriteMessage(websocket.TextMessage, hello)
+	client := &Client{BotID: botID, hub: h, send: make(chan []byte, 256)}
+	h.Register(client)
+	go client.WritePumpGorilla(conn)
+	defer h.Unregister(client)
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -331,4 +352,10 @@ func (h *Hub) ServeWSGorilla(w http.ResponseWriter, r *http.Request, botID strin
 		msgHandler.HandleMessage(botID, msg)
 	}
 	conn.Close()
+}
+
+func (c *Client) WritePumpGorilla(conn *websocket.Conn) {
+	for msg := range c.send {
+		conn.WriteMessage(websocket.TextMessage, msg)
+	}
 }
