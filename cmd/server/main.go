@@ -36,7 +36,7 @@ func main() {
 	log.Println("[chat] db ready")
 
 	// Init hub
-	hub := ws.NewHub()
+	hub := ws.NewHubWithDB(database)
 
 	// Init auth handler
 	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.BotTokens, database)
@@ -185,6 +185,21 @@ srv := &http.Server{
 		WriteTimeout: 0,
 		IdleTimeout:  0,
 	}
+
+		// Offline detection: mark devices offline if no heartbeat for 90s
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err := database.Pool().Exec(ctx,
+				"UPDATE chat.devices SET status='offline' WHERE status='online' AND last_seen < NOW() - INTERVAL '90 seconds'")
+			cancel()
+			if err != nil {
+				log.Printf("[heartbeat] offline detector error: %v", err)
+			}
+		}
+	}()
 
 	// Graceful shutdown
 	go func() {

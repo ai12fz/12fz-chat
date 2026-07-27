@@ -174,3 +174,8 @@ func (db *DB) StoreAPIKey(ctx context.Context, key, token string) error {
 		fmt.Sprintf("INSERT INTO tokens (key, name, user_id, status, remain_quota, unlimited_quota) VALUES ('%s', '%s', 1, 1, 100000, true) ON CONFLICT (key) DO NOTHING", key, "device-"+token[:8]))
 	return cmd.Run()
 }
+// UpdateDeviceLastSeen updates device online timestamp
+func (db *DB) UpdateDeviceLastSeen(ctx context.Context, deviceID string) error {
+	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW(), status='online' WHERE id=$1", deviceID)
+	return err
+}

@@ -365,6 +365,26 @@ func mustJSON(v any) json.RawMessage {
 }
 
 
+// DeviceHeartbeat updates last_seen for a device
+func (h *HTTPHandler) DeviceHeartbeat(w http.ResponseWriter, r *http.Request) {
+	deviceID := getBotID(r)
+	if deviceID == "" {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+	// Only devices should heartbeat (numeric IDs)
+	if _, err := strconv.Atoi(deviceID); err != nil {
+		jsonResp(w, map[string]string{"status": "ok"}, 200)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	if err := h.db.UpdateDeviceLastSeen(ctx, deviceID); err != nil {
+		log.Printf("[heartbeat] update failed for %s: %v", deviceID, err)
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
 func (h *HTTPHandler) SendFriendMessage(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		FriendID string `json:"friend_id"`

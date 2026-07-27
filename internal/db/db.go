@@ -29,6 +29,8 @@ func Connect(cfg interface{ PGConnString() string }) (*DB, error) {
 	return &DB{pool: pool}, nil
 }
 
+func (d *DB) Pool() *pgxpool.Pool { return d.pool }
+
 func ConnectBoth(chatDSN, platformDSN string) (*DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

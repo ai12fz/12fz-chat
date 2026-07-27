@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"context"
 	"net"
 	"net/http"
 	"sync"
@@ -44,10 +45,19 @@ type Client struct {
 type Hub struct {
 	mu      sync.RWMutex
 	clients map[string]*Client
+	db      DB
+}
+
+type DB interface {
+	UpdateDeviceLastSeen(ctx context.Context, deviceID string) error
 }
 
 func NewHub() *Hub {
 	return &Hub{clients: make(map[string]*Client)}
+}
+
+func NewHubWithDB(db DB) *Hub {
+	return &Hub{clients: make(map[string]*Client), db: db}
 }
 
 func (h *Hub) Register(client *Client) {
@@ -222,6 +232,14 @@ func (c *Client) ReadPumpRaw(handler MessageHandler) {
 			}
 			if msg.Type == "message" {
 				handler.HandleMessage(c.BotID, msg.Data)
+			}
+			if msg.Type == "heartbeat" {
+				// Update last_seen for the device/bot
+				if c.hub.db != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+					defer cancel()
+					c.hub.db.UpdateDeviceLastSeen(ctx, c.BotID)
+				}
 			}
 		}
 	}
