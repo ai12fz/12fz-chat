@@ -225,25 +225,31 @@ watch(() => chat.activeId, async () => {
     } catch(e) {}
     return
   }
-  // Poll for new friend messages every 5s
+  // Poll for new friend messages every 3s (with cleanup)
     let _ft = setInterval(async () => {
       try {
         const msgs2 = await getFriendMessages(myId, fid)
         if (msgs2 && msgs2.length > 0) {
           const idx2 = chat.sessions.findIndex(x => x.id === sid)
-          if (idx2 >= 0 && msgs2.length > chat.sessions[idx2].messages.length) {
-            chat.sessions[idx2].messages = msgs2.slice().reverse().map(m => ({
+          if (idx2 >= 0) {
+            const oldLen = chat.sessions[idx2].messages.length
+            const newMsgs = msgs2.slice().reverse().map(m => ({
               id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)),
               content: m.content, msg_type: 'text', created_at: m.created_at
             }))
-            chat.sessions[idx2].lastMsg = msgs2[msgs2.length-1].content
-            chat.sessions[idx2].lastMsgAt = msgs2[msgs2.length-1].created_at
-            await nextTick()
-            msgListRef.value && (msgListRef.value.scrollTop = msgListRef.value.scrollHeight)
+            if (newMsgs.length > oldLen) {
+              chat.sessions[idx2].messages = newMsgs
+              chat.sessions[idx2].lastMsg = msgs2[msgs2.length-1].content
+              chat.sessions[idx2].lastMsgAt = msgs2[msgs2.length-1].created_at
+              await nextTick()
+              msgListRef.value && (msgListRef.value.scrollTop = msgListRef.value.scrollHeight)
+            }
           }
         }
-      } catch(e) { clearInterval(_ft) }
-    }, 5000)
+      } catch(e) { /* ignore poll errors */ }
+    }, 3000)
+    // Cleanup on session change
+    return () => { clearInterval(_ft) }
     if (sid.startsWith("friend:")) {
     const fid = sid.replace("friend:", "")
     const myId = tok.startsWith("session-") ? tok.slice(8) : tok
