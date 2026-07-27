@@ -111,6 +111,11 @@ const sortedSessions = computed(() => {
       return hasContent || hasLastMsg
     })
     .sort(function(a,b){
+      // 好友和设备排在群前面
+      var aIsGroup = a.type === 'group'
+      var bIsGroup = b.type === 'group'
+      if (aIsGroup !== bIsGroup) return aIsGroup ? 1 : -1
+      // 同类型按最后消息时间倒序
       var at = a.lastMsgAt || ''
       var bt = b.lastMsgAt || ''
       if (at > bt) return -1
