@@ -168,7 +168,7 @@ onUnmounted(() => stopPolling())
 
 .collapsed-tab {
   width: 32px;
-  height: 100vh;
+  height: 100%;
   background: #fafafa;
   border-left: 1px solid #e8e8e8;
   cursor: pointer;
@@ -192,7 +192,7 @@ onUnmounted(() => stopPolling())
   background: #fafafa;
   flex-shrink: 0;
   overflow-y: auto;
-  height: 100vh;
+  height: 100%;
 }
 .panel-header {
   padding: 10px 16px;

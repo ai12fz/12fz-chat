@@ -70,7 +70,7 @@ onMounted(async () => {
 <style scoped>
 .chat-layout {
   display: flex;
-  height: 100vh;
+  height: 100%;
   background: #fff;
 }
 </style>
