@@ -46,10 +46,33 @@ func main() {
 
 	// Setup router
 	r := mux.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			path := req.URL.Path
+			if path == "/health" || path == "/ws" || path == "/api/devices/register" || path == "/api/devices/setup" {
+				next.ServeHTTP(w, req)
+				return
+			}
+			token := handler.ExtractTokenFromHeader(req)
+			if token == "" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(401)
+				w.Write([]byte(`{"error":"missing token"}`))
+				return
+			}
+			if _, err := authHandler.ValidateToken(token); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(401)
+				w.Write([]byte(`{"error":"invalid token"}`))
+				return
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
+
 
 	// Health check (public)
 	r.HandleFunc("/health", httpHandler.Health).Methods("GET")
-	r.HandleFunc("/api/system/notify", httpHandler.SystemNotify).Methods("POST")
 	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
 	
 	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
