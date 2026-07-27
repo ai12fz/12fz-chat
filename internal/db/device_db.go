@@ -17,10 +17,10 @@ type Device struct {
 	Token     string    `json:"token"`
 	OS        string    `json:"os"`
 	Status    string    `json:"status"`
-	LastSeen  time.Time 
-	AllowSkills   bool 
-	AllowSoftware bool `json:"last_seen"`
-	CreatedAt time.Time `json:"created_at"`
+	LastSeen  time.Time `json:"last_seen"` 
+	AllowSkills   bool `json:"allow_install_skills"` 
+	AllowSoftware bool `json:"allow_install_software"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*Device, error) {
@@ -54,7 +54,7 @@ func (d *DB) ValidateDeviceToken(ctx context.Context, token string) (*Device, er
 
 func (d *DB) ListDevicesByOrg(ctx context.Context, orgID string) ([]Device, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT id, name, org_id, token, os, status, last_seen, created_at FROM chat.devices WHERE org_id=$1 ORDER BY last_seen DESC", orgID)
+		"SELECT id, name, org_id, token, os, status, last_seen, created_at, COALESCE(allow_install_skills,true), COALESCE(allow_install_software,false) FROM chat.devices WHERE org_id=$1 ORDER BY last_seen DESC", orgID)
 	if err != nil {
 		return nil, err
 	}
