@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -149,6 +150,22 @@ func (db *DB) ListRegCodes(ctx context.Context, orgID string) ([]map[string]inte
 func (db *DB) RevokeRegCode(ctx context.Context, orgID, code string) error {
 	_, err := db.pool.Exec(ctx, "UPDATE chat.device_reg_codes SET status=$1 WHERE org_id=$2 AND code=$3 AND status=$4", "revoked", orgID, code, "active")
 	return err
+}
+
+
+// autoFriendDevice adds the device as a friend for all users in the org
+func (db *DB) autoFriendDevice(ctx context.Context, deviceID, deviceName, orgID string) {
+	rows, err := db.pool.Query(ctx,
+		"SELECT user_id FROM org_user WHERE org_id=", orgID)
+	if err != nil { return }
+	defer rows.Close()
+	for rows.Next() {
+		var uid int64
+		if err := rows.Scan(&uid); err != nil { continue }
+		db.pool.Exec(ctx,
+			"INSERT INTO chat.friends (user_id, friend_id, user_type) VALUES (, , ) ON CONFLICT (user_id, friend_id) DO NOTHING",
+			strconv.FormatInt(uid, 10), deviceID, "device")
+	}
 }
 
 func (db *DB) StoreAPIKey(ctx context.Context, key, token string) error {
