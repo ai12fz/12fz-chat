@@ -29,45 +29,79 @@
 
     <!-- Agent Modal -->
     <div v-if="showAgent" class="modal-overlay" @click.self="showAgent = false">
-      <div class="modal">
+      <div class="modal" style="max-width:560px">
         <h3>{{ editAgent.bot_id ? '编辑' : '新建' }} Agent</h3>
-        <div class="form-group"><label>Bot ID</label><input v-model="editAgent.bot_id" :disabled="!!editAgent.bot_id" placeholder="英文标识，如 my-agent" /></div>
-        <div class="form-group"><label>显示名</label><input v-model="editAgent.display_name" placeholder="显示名称" /></div>
-        <div class="form-group"><label>分类</label>
-          <select v-model="editAgent.category" @change="applyTemplate">
-            <option value="">选择分类模板</option>
-            <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-          </select>
+        
+        <!-- Tab bar -->
+        <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #eee">
+          <div :class="'tab-btn' + (agentTab==='quick'?' active':'')" @click="agentTab='quick'" style="padding:6px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:14px">⚡ 快速配置</div>
+          <div :class="'tab-btn' + (agentTab==='custom'?' active':'')" @click="agentTab='custom'" style="padding:6px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:14px;color:#999">🔧 自定义配置</div>
         </div>
-        <div class="form-group"><label>模型</label>
-          <select v-model="editAgent.model">
-            <option value="tk.12fz.com">中转站</option>
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="gpt-3.5-turbo">GPT-3.5</option>
-            <option value="claude-sonnet-4">Claude Sonnet 4</option>
-            <option value="deepseek-v3">DeepSeek V3</option>
-            <option value="qwen-max">Qwen Max</option>
-          </select>
-        </div>
-        <div class="form-group"><label>System Prompt</label><textarea v-model="editAgent.system_prompt" rows="4" placeholder="定义 Agent 的角色和行为..."></textarea></div>
-        <div class="form-group"><label>API Key</label><input v-model="editAgent.api_key" type="password" placeholder="API 密钥" /></div>
-        <div class="form-group"><label>API URL</label><input v-model="editAgent.api_url" placeholder="如 https://ai.12fz.com/v1" /></div>
-        <div class="form-group"><label>能力</label>
-          <div class="checkbox-group">
-            <label v-for="c in ['code','search','terminal','file','web','vision']" :key="c"><input type="checkbox" :value="c" v-model="editAgent.capabilities" /> {{ c }}</label>
+
+        <!-- Quick Config -->
+        <div v-show="agentTab==='quick'">
+          <div class="form-group"><label>显示名称 *</label><input v-model="editAgent.display_name" placeholder="如：销售助手" /></div>
+          <div class="form-group"><label>分类 *</label>
+            <select v-model="editAgent.category" @change="applyTemplate">
+              <option value="">选择分类</option>
+              <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+          <div v-if="editAgent.category" style="background:#f0f9ff;padding:8px 12px;border-radius:6px;margin:8px 0;font-size:13px;color:#555">
+            ✅ 将使用「{{ editAgent.category }}」模板预设的能力和提示词
+          </div>
+          <div v-if="error" class="error">{{ error }}</div>
+          <div class="modal-btns" style="margin-top:15px">
+            <button @click="showAgent = false">取消</button>
+            <button class="btn-primary" @click="saveQuickAgent" :disabled="saving">{{ saving ? '创建中...' : '创建 Agent' }}</button>
+          </div>
+          <div v-if="installCmd" style="margin-top:12px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;padding:12px">
+            <div style="font-size:13px;color:#52c41a;margin-bottom:6px">✅ Agent 创建成功！在终端执行以下命令安装：</div>
+            <code style="display:block;background:#fff;padding:8px;border-radius:4px;font-size:12px;word-break:break-all;overflow-x:auto">{{ installCmd }}</code>
+            <button style="margin-top:8px;font-size:12px" @click="copyText(installCmd)">📋 复制命令</button>
           </div>
         </div>
-        <div class="form-group"><label>状态</label><select v-model="editAgent.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
-        <div v-if="error" class="error">{{ error }}</div>
-        <div class="modal-btns">
-          <button @click="showAgent = false">取消</button>
-          <button class="btn-primary" @click="saveAgent" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+
+        <!-- Custom Config (existing form, hidden when quick) -->
+        <div v-show="agentTab==='custom'">
+          <div class="form-group"><label>Bot ID</label><input v-model="editAgent.bot_id" :disabled="!!editAgent.bot_id" placeholder="英文标识，如 my-agent" /></div>
+          <div class="form-group"><label>显示名</label><input v-model="editAgent.display_name" placeholder="显示名称" /></div>
+          <div class="form-group"><label>分类</label>
+            <select v-model="editAgent.category" @change="applyTemplate">
+              <option value="">选择分类模板</option>
+              <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+          <div class="form-group"><label>模型</label>
+            <select v-model="editAgent.model">
+              <option value="tk.12fz.com">中转站</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-3.5-turbo">GPT-3.5</option>
+              <option value="claude-sonnet-4">Claude Sonnet 4</option>
+              <option value="deepseek-v3">DeepSeek V3</option>
+              <option value="qwen-max">Qwen Max</option>
+            </select>
+          </div>
+          <div class="form-group"><label>System Prompt</label><textarea v-model="editAgent.system_prompt" rows="4" placeholder="定义 Agent 的角色和行为..."></textarea></div>
+          <div class="form-group"><label>API Key</label><input v-model="editAgent.api_key" type="password" placeholder="API 密钥" /></div>
+          <div class="form-group"><label>API URL</label><input v-model="editAgent.api_url" placeholder="如 https://ai.12fz.com/v1" /></div>
+          <div class="form-group"><label>能力</label>
+            <div class="checkbox-group">
+              <label v-for="c in ['code','search','terminal','file','web','vision']" :key="c"><input type="checkbox" :value="c" v-model="editAgent.capabilities" /> {{ c }}</label>
+            </div>
+          </div>
+          <div class="form-group"><label>状态</label><select v-model="editAgent.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+          <div v-if="error" class="error">{{ error }}</div>
+          <div class="modal-btns">
+            <button @click="showAgent = false">取消</button>
+            <button class="btn-primary" @click="saveAgent" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Groups Modal -->
-    <div v-if="showGroups" class="modal-overlay" @click.self="showGroups = false">
+        <div v-if="showGroups" class="modal-overlay" @click.self="showGroups = false">
       <div class="modal">
         <h3>{{ selectedAgent?.display_name }} — 群聊绑定</h3>
         <div v-if="groups.length" class="group-list">
@@ -94,6 +128,8 @@ const selectedAgent = ref<any>(null)
 const selectedGroups = ref<number[]>([])
 const saving = ref(false)
 const error = ref('')
+const agentTab = ref('quick')
+const installCmd = ref('')
 
 const editAgent = ref<any>({ bot_id: '', display_name: '', model: '中转站', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' })
 
@@ -112,6 +148,34 @@ function applyTemplate() {
   const t = categoryTemplates[editAgent.value.category]
   if (t) { editAgent.value.system_prompt = t.p; editAgent.value.capabilities = t.c.slice() }
 }
+
+async function saveQuickAgent() {
+  const a = editAgent.value
+  if (!a.display_name) { error.value = '请输入显示名称'; return }
+  if (!a.category) { error.value = '请选择分类'; return }
+  error.value = ''; saving.value = true
+  const t = categoryTemplates[a.category]
+  const body = {
+    bot_id: a.bot_id || 'agent-' + Date.now(),
+    display_name: a.display_name,
+    model: a.model || 'tk.12fz.com',
+    system_prompt: t ? t.p : (a.system_prompt || ''),
+    capabilities: t ? t.c : (a.capabilities || []),
+    category: a.category,
+    status: 'active',
+    api_key: a.api_key || '',
+    api_url: a.api_url || 'https://ai.12fz.com/v1'
+  }
+  try {
+    const res = await request('/api/agents', { method: 'POST', body: JSON.stringify(body) })
+    showAgent.value = false
+    installCmd.value = 'curl -s https://ai.12fz.com/install-agent.sh | bash -s -- --bot-id=' + body.bot_id + ' --token=YOUR_TOKEN'
+    await loadAgents()
+  } catch(e: any) { error.value = e.message || '创建失败' }
+  saving.value = false
+}
+
+function copyText(t: string) { navigator.clipboard.writeText(t).then(() => alert('已复制')) }
 
 function openAgent(a?: any) {
   editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: '中转站', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' }
@@ -169,6 +233,12 @@ th { background: #fafafa; font-weight: 500; }
 .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 6px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
 .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .checkbox-group label { font-size: 13px; cursor: pointer; }
+
+
+.tab-btn.active { color: #1890ff !important; border-bottom-color: #1890ff !important; font-weight: 600; }
+.tab-btn:not(.active):hover { color: #1890ff; }
+
+
 .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .error { color: #f5222d; font-size: 13px; margin-top: 8px; }
 .group-list { max-height: 300px; overflow-y: auto; }
