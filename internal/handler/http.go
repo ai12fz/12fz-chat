@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -75,13 +76,17 @@ func getBotID(r *http.Request) string {
 func (h *HTTPHandler) StaticHandler() http.Handler {
 	fs := http.FileServer(http.Dir("frontend/dist"))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// For SPA: serve index.html for all non-API, non-WS routes
 		path := r.URL.Path
-		if path == "/" || path == "" {
-			http.ServeFile(w, r, "frontend/dist/index.html")
-			return
+		// Serve index.html for SPA routes
+		if path == "/" || !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/ws") && !strings.HasPrefix(path, "/v1/") {
+			// Check if file exists first
+			f, err := os.Open("frontend/dist" + path)
+			if err != nil {
+				http.ServeFile(w, r, "frontend/dist/index.html")
+				return
+			}
+			f.Close()
 		}
-		// Serve static files if they exist
 		fs.ServeHTTP(w, r)
 	})
 }

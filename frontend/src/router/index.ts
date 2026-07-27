@@ -21,7 +21,7 @@ router.beforeEach((to, _from, next) => {
     window.history.replaceState({}, '', window.location.pathname)
   }
   const token = localStorage.getItem('token')
-  if (!token) {
+  if (!token && !to.path.startsWith('/admin')) {
     window.location.href = GO_URL
     return
   }
