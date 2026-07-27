@@ -366,6 +366,65 @@ func mustJSON(v any) json.RawMessage {
 
 
 // DeviceHeartbeat updates last_seen for a device
+// ListSkills returns all available skills
+func (h *HTTPHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
+	skills, err := h.db.ListSkills(r.Context())
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, skills, 200)
+}
+
+// CreateSkill adds a new skill
+func (h *HTTPHandler) CreateSkill(w http.ResponseWriter, r *http.Request) {
+	var s map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	if err := h.db.CreateSkill(r.Context(), s); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+// UpdateSkill updates a skill
+func (h *HTTPHandler) UpdateSkill(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var s map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&s)
+	if err := h.db.UpdateSkill(r.Context(), name, s); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+// DeleteSkill deletes a skill
+func (h *HTTPHandler) DeleteSkill(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if err := h.db.DeleteSkill(r.Context(), name); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+// PublicFriendMessages allows devices to get messages via query token
+func (h *HTTPHandler) PublicFriendMessages(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" { jsonError(w, "missing token", 401); return }
+	botID, err := h.authHandler.ValidateToken(token)
+	if err != nil { jsonError(w, "invalid token: "+err.Error(), 401); return }
+	otherID := r.URL.Query().Get("with")
+	msgs, err := h.db.GetFriendMessages(r.Context(), botID, otherID, 50, 0)
+	if err != nil { jsonError(w, err.Error(), 500); return }
+	if msgs == nil { msgs = make([]model.FriendMessage, 0) }
+	jsonResp(w, msgs, 200)
+}
+
 func (h *HTTPHandler) DeviceHeartbeat(w http.ResponseWriter, r *http.Request) {
 	deviceID := getBotID(r)
 	if deviceID == "" {

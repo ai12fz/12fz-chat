@@ -1,0 +1,50 @@
+package db
+
+import "context"
+
+type Skill struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Icon        string `json:"icon"`
+	InstallCmd  string `json:"install_cmd"`
+	ToolDef     string `json:"tool_definition"`
+	Handler     string `json:"handler"`
+}
+
+func (db *DB) ListSkills(ctx context.Context) ([]map[string]interface{}, error) {
+	rows, err := db.pool.Query(ctx, `SELECT name,display_name,description,category,icon,install_cmd,tool_definition::text,handler FROM chat.skills WHERE status='active' ORDER BY category,id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]interface{}
+	for rows.Next() {
+		var name, display, desc, cat, icon, install, toolDef, handler string
+		rows.Scan(&name, &display, &desc, &cat, &icon, &install, &toolDef, &handler)
+		out = append(out, map[string]interface{}{
+			"name": name, "display_name": display, "description": desc,
+			"category": cat, "icon": icon, "install_cmd": install,
+			"tool_definition": toolDef, "handler": handler,
+		})
+	}
+	return out, nil
+}
+
+func (db *DB) CreateSkill(ctx context.Context, s map[string]interface{}) error {
+	_, err := db.pool.Exec(ctx, `INSERT INTO chat.skills (name,display_name,description,category,icon,install_cmd,tool_definition,handler) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+		s["name"], s["display_name"], s["description"], s["category"], s["icon"], s["install_cmd"], s["tool_definition"], s["handler"])
+	return err
+}
+
+func (db *DB) UpdateSkill(ctx context.Context, name string, s map[string]interface{}) error {
+	_, err := db.pool.Exec(ctx, `UPDATE chat.skills SET display_name=$1,description=$2,category=$3,icon=$4,install_cmd=$5,tool_definition=$6::jsonb,handler=$7 WHERE name=$8`,
+		s["display_name"], s["description"], s["category"], s["icon"], s["install_cmd"], s["tool_definition"], s["handler"], name)
+	return err
+}
+
+func (db *DB) DeleteSkill(ctx context.Context, name string) error {
+	_, err := db.pool.Exec(ctx, `DELETE FROM chat.skills WHERE name=$1`, name)
+	return err
+}
