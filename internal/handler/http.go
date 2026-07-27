@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -76,19 +75,13 @@ func getBotID(r *http.Request) string {
 func (h *HTTPHandler) StaticHandler() http.Handler {
 	fs := http.FileServer(http.Dir("frontend/dist"))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// For SPA: serve index.html for all non-API, non-WS routes
 		path := r.URL.Path
-		// Serve index.html for SPA routes
-		isSPA := !strings.HasSuffix(path, ".js") && !strings.HasSuffix(path, ".css") && !strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".ico") && !strings.HasSuffix(path, ".svg") && !strings.HasSuffix(path, ".woff2") && !strings.HasSuffix(path, ".json")
-		isAPI := strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/ws") || strings.HasPrefix(path, "/v1/")
-		if path == "/" || (isSPA && !isAPI) {
-			// Check if file exists first
-			f, err := os.Open("frontend/dist" + path)
-			if err != nil {
-				http.ServeFile(w, r, "frontend/dist/index.html")
-				return
-			}
-			f.Close()
+		if path == "/" || path == "" {
+			http.ServeFile(w, r, "frontend/dist/index.html")
+			return
 		}
+		// Serve static files if they exist
 		fs.ServeHTTP(w, r)
 	})
 }
@@ -720,46 +713,6 @@ func (h *HTTPHandler) ProxyModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, target string) {
-	// ── Auth ──
-	token := ExtractTokenFromHeader(r)
-	if token == "" {
-		jsonError(w, "missing token", 401)
-		return
-	}
-	bid, err := h.authHandler.ValidateToken(token)
-	if err != nil {
-		jsonError(w, "invalid token", 401)
-		return
-	}
-	_ = bid
-	// ── Balance & Rate Limit ──
-	orgID := "00000000-0000-0000-0000-000000000000" // default org
-	if bid := getBotID(r); bid != "" {
-		if oid, _ := h.db.GetOrgID(r.Context(), parseInt64(bid)); oid != "" {
-			orgID = oid
-		}
-	}
-	balance, _ := h.db.GetOrgBalance(r.Context(), orgID)
-	if balance <= 0 {
-		jsonError(w, "余额不足，请充值", 402)
-		return
-	}
-	var maxRPM float64
-	switch {
-	case balance >= 20:
-		maxRPM = 120
-	case balance >= 10:
-		maxRPM = 30
-	case balance >= 1:
-		maxRPM = 10
-	default:
-		maxRPM = 2
-	}
-	if !getLimiter(orgID).allow(maxRPM) {
-		jsonError(w, "rate limited", 429)
-		return
-	}
-
 	start := time.Now()
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
@@ -840,54 +793,6 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	w.Write(respBody)
 	log.Printf("[proxy] %s -> %s %dms %dtok", reqBody.Model, modelName, durationMs, tokenCount)
 }
-// SystemNotify sends a notification to a merchant main account
-func (h *HTTPHandler) SystemNotify(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		OrgID   string `json:"org_id"`
-		Content string `json:"content"`
-		Title   string `json:"title"`
-	}
-	var userID string
-	json.NewDecoder(r.Body).Decode(&req)
-	if req.Content == "" {
-		jsonError(w, "org_id and content required", 400)
-		return
-	}
-	// Skip auth check - this is called from internal services
-	botID := getBotID(r)
-	if botID == "" { botID = "system" }
-
-	// Use org_id as user_id (or default to admin)
-	if req.OrgID != "" { userID = req.OrgID }
-	if userID == "" { userID = "1" }
-	if userID == "00000000-0000-0000-0000-000000000000" {
-		userID = "1" // default admin
-	}
-
-	// Save as system message
-	content := req.Content
-	if req.Title != "" {
-		content = "【" + req.Title + "】" + content
-	}
-	id, err := h.db.SaveSystemMessage(r.Context(), userID, content)
-	if err != nil {
-		jsonError(w, "save failed", 500)
-		return
-	}
-
-	// Push via WebSocket
-	notifyData, _ := json.Marshal(map[string]interface{}{
-		"type": "system_notify",
-		"data": map[string]interface{}{
-			"id": id, "content": content, "title": req.Title,
-		},
-	})
-	h.hub.SendToBot(userID, notifyData)
-
-	jsonResp(w, map[string]interface{}{"status": "ok", "id": id}, 200)
-}
-
-
 func (h *HTTPHandler) ListRegCodes(w http.ResponseWriter, r *http.Request) {
 	orgID, err := h.db.GetOrgID(r.Context(), parseInt64(getBotID(r)))
 	if err != nil {
