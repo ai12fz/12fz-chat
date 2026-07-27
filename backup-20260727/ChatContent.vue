@@ -123,22 +123,19 @@ function handleSend() {
   const fmatch = session.value.id.match(/^friend:(.+)$/)
   if (fmatch) {
     ws.sendMessage(fmatch[1], content)
-    sendFriendMessage(fmatch[1], content).then(res => {
-      // Add to local message list immediately (friend WS echo not supported)
-      if (session.value && res && res.id) {
-        session.value.messages.push({
-          id: res.id,
-          group_id: fmatch[1],
-          sender_id: auth.userId || auth.userId || 'me',
-          content: content,
-          msg_type: 'text',
-          created_at: new Date().toISOString()
-        })
-        session.value.lastMsg = content
-        session.value.lastMsgAt = new Date().toISOString()
+    sendFriendMessage(fmatch[1], content).then(function(res: any){
+      if (res && res.id) {
+        const sid2 = 'friend:' + fmatch[1]
+        const idx2 = chat.sessions.findIndex(function(x: any){ return x.id === sid2 })
+        if (idx2 >= 0) {
+          chat.sessions[idx2].messages.push({
+            id: res.id, group_id: 0,
+            sender_id: auth.userId || 'me', content: content,
+            msg_type: 'text', created_at: new Date().toISOString()
+          })
+        }
       }
     }).catch(function(){})
-    if (session.value) session.value.lastMsgAt = new Date().toISOString()
   }
   text.value = ''
   showEmoji.value = false
@@ -228,7 +225,26 @@ watch(() => chat.activeId, async () => {
     } catch(e) {}
     return
   }
-  if (sid.startsWith("friend:")) {
+  // Poll for new friend messages every 5s
+    let _ft = setInterval(async () => {
+      try {
+        const msgs2 = await getFriendMessages(myId, fid)
+        if (msgs2 && msgs2.length > 0) {
+          const idx2 = chat.sessions.findIndex(x => x.id === sid)
+          if (idx2 >= 0 && msgs2.length > chat.sessions[idx2].messages.length) {
+            chat.sessions[idx2].messages = msgs2.slice().reverse().map(m => ({
+              id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)),
+              content: m.content, msg_type: 'text', created_at: m.created_at
+            }))
+            chat.sessions[idx2].lastMsg = msgs2[msgs2.length-1].content
+            chat.sessions[idx2].lastMsgAt = msgs2[msgs2.length-1].created_at
+            await nextTick()
+            msgListRef.value && (msgListRef.value.scrollTop = msgListRef.value.scrollHeight)
+          }
+        }
+      } catch(e) { clearInterval(_ft) }
+    }, 5000)
+    if (sid.startsWith("friend:")) {
     const fid = sid.replace("friend:", "")
     const myId = tok.startsWith("session-") ? tok.slice(8) : tok
     try {
