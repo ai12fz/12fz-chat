@@ -78,7 +78,9 @@ func (h *HTTPHandler) StaticHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		// Serve index.html for SPA routes
-		if path == "/" || !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/ws") && !strings.HasPrefix(path, "/v1/") {
+		isSPA := !strings.HasSuffix(path, ".js") && !strings.HasSuffix(path, ".css") && !strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".ico") && !strings.HasSuffix(path, ".svg") && !strings.HasSuffix(path, ".woff2") && !strings.HasSuffix(path, ".json")
+		isAPI := strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/ws") || strings.HasPrefix(path, "/v1/")
+		if path == "/" || (isSPA && !isAPI) {
 			// Check if file exists first
 			f, err := os.Open("frontend/dist" + path)
 			if err != nil {

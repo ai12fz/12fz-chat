@@ -57,7 +57,7 @@ func main() {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			path := req.URL.Path
-			if strings.HasPrefix(path, "/chat/") || strings.HasPrefix(path, "/assets/") ||
+			if strings.HasPrefix(path, "/chat/") || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/admin/") ||
 			path == "/" || path == "/favicon.ico" || path == "/health" ||
 			path == "/ws" || path == "/api/devices/register" || path == "/api/devices/setup" {
 				next.ServeHTTP(w, req)
