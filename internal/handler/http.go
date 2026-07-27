@@ -728,17 +728,33 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	// Read response to extract actual model name and token count
 	respBody, _ := io.ReadAll(resp.Body)
 	var parsed struct {
-		Usage struct {
-			TotalTokens int `json:"total_tokens"`
-		} `json:"usage"`
 		ModelNm string `json:"model"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		} `json:"usage"`
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
 	}
 	json.Unmarshal(respBody, &parsed)
 	modelName := parsed.ModelNm
-	if modelName == "" { modelName = "deepseek" }
+	if modelName == "" { modelName = "unknown" }
 	tokenCount := parsed.Usage.TotalTokens
+	errMsg := parsed.Error.Message
 
-	go h.db.LogProxyUsage(context.Background(), modelName, tokenCount)
+	// Sync log - critical for billing, must not drop. Retry once.
+	for attempt := 0; attempt < 2; attempt++ {
+		err2 := h.db.LogProxyUsage(r.Context(), modelName, tokenCount)
+		if err2 == nil { break }
+		if attempt == 1 {
+			// Fallback: write to local file as last resort
+			log.Printf("[proxy] USAGE LOG FAILED after retry: %v (model=%s tokens=%d err=%s)", err2, modelName, tokenCount, errMsg)
+		} else {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 
 	for k, vs := range resp.Header {
 		for _, v := range vs { w.Header().Add(k, v) }
