@@ -11,6 +11,7 @@
     <div class="tab-bar">
       <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
       <div class="tab" :class="{ active: activeTab === 'friends' }" @click="activeTab = 'friends'">好友</div>
+      <div class="tab" :class="{ active: activeTab === 'agent' }" @click="activeTab = 'agent'">Agent</div>
     </div>
 
     <div class="tab-content" v-show="activeTab === 'msg'">
@@ -25,7 +26,7 @@
               <span class="session-name">{{ s.name }}</span>
               <span v-if="s.type === 'group'" class="session-badge">群</span>
               <span v-else-if="s.userType === 'agent'" class="session-badge badge-agent">🤖 Agent</span>
-              <span v-else-if="s.userType === 'device'" class="session-badge badge-device">🖥 设备</span>
+              <span v-else-if="s.userType === 'device'" class="session-badge badge-device">🖥 主机</span>
               <span v-else class="session-badge badge-human">👤 好友</span>
             </div>
             <span class="session-msg">{{ s.lastMsg || '暂无消息' }}</span>
@@ -36,21 +37,38 @@
       </nav>
     </div>
 
-    <div class="tab-content" v-show="activeTab === 'friends'">
+    
+    <div class="tab-content" v-show="activeTab === 'agent'">
       <nav class="session-list">
-        <div v-for="f in (friends || [])" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
+        <div v-for="f in agentFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
+          <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
+          <div class="session-info">
+            <div class="session-top">
+              <span class="session-name">{{ f.friend_id }}</span>
+              <span class="session-badge badge-agent">🤖 Agent</span>
+            </div>
+            <span class="session-msg">{{ f.status || '暂无消息' }}</span>
+          </div>
+        </div>
+        <div v-if="agentFriends.length === 0" class="empty-hint">暂无 Agent</div>
+      </nav>
+    </div>
+
+<div class="tab-content" v-show="activeTab === 'friends'">
+      <nav class="session-list">
+        <div v-for="f in nonAgentFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
           <div class="session-info">
             <div class="session-top">
               <span class="session-name">{{ f.friend_id }}</span>
               <span v-if="f.user_type === 'agent'" class="session-badge badge-agent">🤖 Agent</span>
               <span v-else-if="f.user_type === 'human'" class="session-badge badge-human">👤 人工</span>
-              <span v-else-if="f.user_type === 'device'" class="session-badge badge-device">🖥 设备</span>
+              <span v-else-if="f.user_type === 'device'" class="session-badge badge-device">🖥 主机</span>
             </div>
             <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>
         </div>
-        <div v-if="(friends || []).length === 0" class="empty-hint">暂无好友</div>
+        <div v-if="nonAgentFriends.length === 0" class="empty-hint">暂无好友</div>
       </nav>
       <div class="add-friend-bar">
         <div class="session-item" @click="showAddFriend = true">
@@ -94,6 +112,8 @@ const search = ref('')
 const activeTab = ref('msg')
 
 const friends = ref<any[]>([])
+const agentFriends = computed(() => friends.value.filter(f => f.user_type === 'agent'))
+const nonAgentFriends = computed(() => friends.value.filter(f => f.user_type !== 'agent'))
 const showAddFriend = ref(false)
 const showProfile = ref(false)
 const newNickname = ref('')
