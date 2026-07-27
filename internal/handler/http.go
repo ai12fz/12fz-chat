@@ -713,6 +713,18 @@ func (h *HTTPHandler) ProxyModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, target string) {
+	// ── Auth ──
+	token := ExtractTokenFromHeader(r)
+	if token == "" {
+		jsonError(w, "missing token", 401)
+		return
+	}
+	bid, err := h.authHandler.ValidateToken(token)
+	if err != nil {
+		jsonError(w, "invalid token", 401)
+		return
+	}
+	_ = bid
 	// ── Balance & Rate Limit ──
 	orgID := "00000000-0000-0000-0000-000000000000" // default org
 	if bid := getBotID(r); bid != "" {
