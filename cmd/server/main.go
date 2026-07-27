@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
+	"sync"
 	"os"
 	"os/signal"
 	"time"
@@ -45,15 +47,36 @@ func main() {
 	httpHandler := handler.NewHTTPHandler(database, hub, authHandler)
 
 	// Setup router
+	var (
+	authMu     sync.Mutex
+	authCounts = make(map[string]int)
+	authResets = make(map[string]time.Time)
+)
+
 	r := mux.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			path := req.URL.Path
-			if path == "/health" || path == "/ws" || path == "/api/devices/register" || path == "/api/devices/setup" {
+			if strings.HasPrefix(path, "/chat/") || strings.HasPrefix(path, "/assets/") ||
+			path == "/" || path == "/favicon.ico" || path == "/health" ||
+			path == "/ws" || path == "/api/devices/register" || path == "/api/devices/setup" {
 				next.ServeHTTP(w, req)
 				return
 			}
 			token := handler.ExtractTokenFromHeader(req)
+			ip,_,_ := strings.Split(req.RemoteAddr, ":")[0], "", ""
+			authMu.Lock()
+			if t,ok := authResets[ip]; !ok || time.Now().After(t) {
+				authCounts[ip] = 0
+				authResets[ip] = time.Now().Add(time.Minute)
+			}
+			authCounts[ip]++
+			n := authCounts[ip]
+			authMu.Unlock()
+			if n > 60 {
+				http.Error(w, "rate limited", 429)
+				return
+			}
 			if token == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(401)
