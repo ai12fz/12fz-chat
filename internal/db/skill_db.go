@@ -13,8 +13,8 @@ type Skill struct {
 	Handler     string `json:"handler"`
 }
 
-func (db *DB) ListSkills(ctx context.Context) ([]map[string]interface{}, error) {
-	rows, err := db.pool.Query(ctx, `SELECT name,display_name,description,category,icon,install_cmd,tool_definition::text,handler FROM chat.skills WHERE status='active' ORDER BY category,id`)
+func (db *DB) ListSkills(ctx context.Context, orgID string) ([]map[string]interface{}, error) {
+	rows, err := db.pool.Query(ctx, `SELECT name,display_name,description,category,icon,install_cmd,tool_definition::text,handler FROM chat.skills WHERE status='active' AND (org_id = $1 OR org_id = '00000000-0000-0000-0000-000000000000') ORDER BY category,id`, orgID)
 	if err != nil {
 		return nil, err
 	}

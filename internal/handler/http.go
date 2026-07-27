@@ -368,7 +368,8 @@ func mustJSON(v any) json.RawMessage {
 // DeviceHeartbeat updates last_seen for a device
 // ListSkills returns all available skills
 func (h *HTTPHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
-	skills, err := h.db.ListSkills(r.Context())
+	orgID := r.URL.Query().Get("org_id"); if orgID == "" { orgID = "00000000-0000-0000-0000-000000000000" }
+	skills, err := h.db.ListSkills(r.Context(), orgID)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
