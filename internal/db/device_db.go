@@ -200,3 +200,14 @@ func (d *DB) GetDeviceActivity(ctx context.Context, deviceID string, limit int) 
 	}
 	return out, nil
 }
+
+func (d *DB) CleanupOldMessages(ctx context.Context) (int64, error) {
+	tag, err := d.pool.Exec(ctx, `DELETE FROM chat.friend_messages WHERE id NOT IN (
+		SELECT id FROM (
+			SELECT id, row_number() OVER (PARTITION BY LEAST(from_id, to_id), GREATEST(from_id, to_id) ORDER BY created_at DESC) as rn
+			FROM chat.friend_messages
+		) sub WHERE rn <= 50
+	)`)
+	if err != nil { return 0, err }
+	return tag.RowsAffected(), nil
+}

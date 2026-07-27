@@ -174,6 +174,19 @@ func main() {
 
 	r.PathPrefix("/").Handler(httpHandler.StaticHandler())
 
+		// Hourly cleanup: keep only 50 messages per conversation
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour)
+			n, err := database.CleanupOldMessages(context.Background())
+			if err != nil {
+				log.Printf("[cleanup] err: %v", err)
+			} else if n > 0 {
+				log.Printf("[cleanup] deleted %d old messages", n)
+			}
+		}
+	}()
+
 	// Apply CORS
 		// WS-only server on port 8082 (no timeouts)
 	wsMux := http.NewServeMux()
