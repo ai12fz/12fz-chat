@@ -12,7 +12,7 @@ export function useWebSocket() {
     if (ws) disconnect()
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${protocol}//${location.host}/ws2?token=${token}`
+    const url = `${protocol}//${location.host}/ws?token=${token}`
 
     ws = new WebSocket(url)
 
@@ -74,7 +74,8 @@ export function useWebSocket() {
       }
     }
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
+        console.log('[ws] onclose code=' + e.code + ' reason=' + e.reason + ' wasClean=' + e.wasClean)
       console.log('[ws] disconnected, reconnecting in 3s...')
       store.setConnected(false)
       reconnectTimer.value = window.setTimeout(() => connect(token), 3000)

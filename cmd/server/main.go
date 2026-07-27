@@ -12,7 +12,6 @@ import (
 	"github.com/ai12fz/12fz-chat/internal/config"
 	"github.com/ai12fz/12fz-chat/internal/db"
 	"github.com/ai12fz/12fz-chat/internal/handler"
-	"github.com/ai12fz/12fz-chat/internal/middleware"
 	"github.com/ai12fz/12fz-chat/internal/ws"
 	"github.com/gorilla/mux"
 )
@@ -159,7 +158,7 @@ func main() {
 			return
 		}
 		log.Printf("[chat] WS connect: bot_id=%s", botID)
-		hub.ServeWSGorilla(w, r, botID, msgHandler)
+		hub.ServeWS(w, r, botID, msgHandler)
 	})
 
 	// Serve static frontend
@@ -187,32 +186,21 @@ func main() {
 		}
 	}()
 
-	// Apply CORS
-		// WS-only server on port 8082 (no timeouts)
-	wsMux := http.NewServeMux()
-	wsMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			http.Error(w, "missing token", 401)
-			return
-		}
-		botID, err := authHandler.ValidateToken(token)
-		if err != nil {
-			http.Error(w, "invalid token: "+err.Error(), 401)
-			return
-		}
-		log.Printf("[chat] WS2 connect: bot_id=%s", botID)
-		hub.ServeWSGorilla(w, r, botID, msgHandler)
-	})
-	go func() {
-		wsSrv := &http.Server{Addr: ":8082", Handler: middleware.CORS(wsMux)}
-		log.Printf("WS2 server listening on :8082")
-		wsSrv.ListenAndServe()
-	}()
 
 srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      middleware.CORS(r),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.URL.Path == "/ws" || req.URL.Path == "/ws/" {
+				token := req.URL.Query().Get("token")
+				if token == "" { http.Error(w, "missing token", 401); return }
+				botID, err := authHandler.ValidateToken(token)
+				if err != nil { http.Error(w, "invalid token", 401); return }
+				log.Printf("[chat] WS connect: bot_id=%s", botID)
+				hub.ServeWS(w, req, botID, msgHandler)
+				return
+			}
+			r.ServeHTTP(w, req)
+		}),
 		ReadTimeout:  0,
 		WriteTimeout: 0,
 		IdleTimeout:  0,

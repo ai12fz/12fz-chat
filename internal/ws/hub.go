@@ -62,22 +62,9 @@ func NewHubWithDB(db DB) *Hub {
 }
 
 func (h *Hub) Register(client *Client) {
-	var oldClose func()
 	h.mu.Lock()
-	if old, ok := h.clients[client.BotID]; ok {
-		oldConn := old.raw
-		oldSend := old.send
-		oldClose = func() {
-			close(oldSend)
-			oldConn.Close()
-		}
-	}
 	h.clients[client.BotID] = client
 	h.mu.Unlock()
-
-	if oldClose != nil {
-		oldClose()
-	}
 
 	h.broadcastEvent("user_online", client.BotID)
 	log.Printf("[ws] %s connected", client.BotID)
@@ -353,7 +340,13 @@ func (h *Hub) ServeWSGorilla(w http.ResponseWriter, r *http.Request, botID strin
 }
 
 func (c *Client) WritePumpGorilla(conn *websocket.Conn) {
+	log.Printf("[ws-write] START for %s", c.BotID)
 	for msg := range c.send {
-		conn.WriteMessage(websocket.TextMessage, msg)
+		if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+			log.Printf("[ws-write] %s write err: %v", c.BotID, err)
+			return
+		}
+		log.Printf("[ws-write] %s delivered %d bytes", c.BotID, len(msg))
 	}
+	log.Printf("[ws-write] %s pump done", c.BotID)
 }
