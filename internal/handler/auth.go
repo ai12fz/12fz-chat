@@ -53,6 +53,14 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 		}
 	}
 
+	// Validate API key (sk-xxx, revocable)
+	if strings.HasPrefix(token, "sk-") {
+		orgID, err := h.db.ValidateAPIKey(context.Background(), token)
+		if err == nil {
+			return orgID, nil
+		}
+	}
+
 	// Validate JWT (from go.12fz.com or local)
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {

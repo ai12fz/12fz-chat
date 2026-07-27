@@ -479,4 +479,12 @@ func (d *DB) SaveSystemMessage(ctx context.Context, userID, content string) (int
 		userID, content).Scan(&id)
 	return id, err
 }
+func (d *DB) ValidateAPIKey(ctx context.Context, key string) (string, error) {
+	var orgID string
+	err := d.pool.QueryRow(ctx,
+		"SELECT org_id FROM chat.api_keys WHERE key_hash=encode(sha256($1::bytea),'hex') AND status='active'", key).Scan(&orgID)
+	if err != nil { return "", err }
+	d.pool.Exec(ctx, "UPDATE chat.api_keys SET last_used_at=NOW() WHERE key_hash=encode(sha256($1::bytea),'hex')", key)
+	return orgID, nil
+}
 
