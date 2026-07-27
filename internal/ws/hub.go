@@ -1,23 +1,16 @@
 package ws
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // allow all origins in dev
-	},
-}
 
 // WSMessage is the protocol envelope
 type WSMessage struct {
@@ -43,27 +36,25 @@ type EventPayload struct {
 
 type Client struct {
 	BotID string
-	conn  *websocket.Conn
+	raw   net.Conn
 	hub   *Hub
 	send  chan []byte
 }
 
 type Hub struct {
-	mu       sync.RWMutex
-	clients  map[string]*Client // botID -> client (single connection per bot)
+	mu      sync.RWMutex
+	clients map[string]*Client
 }
 
 func NewHub() *Hub {
-	return &Hub{
-		clients: make(map[string]*Client),
-	}
+	return &Hub{clients: make(map[string]*Client)}
 }
 
 func (h *Hub) Register(client *Client) {
 	var oldClose func()
 	h.mu.Lock()
 	if old, ok := h.clients[client.BotID]; ok {
-		oldConn := old.conn
+		oldConn := old.raw
 		oldSend := old.send
 		oldClose = func() {
 			close(oldSend)
@@ -73,8 +64,6 @@ func (h *Hub) Register(client *Client) {
 	h.clients[client.BotID] = client
 	h.mu.Unlock()
 
-	// Close old connection OUTSIDE the lock so its Unregister
-	// doesn't delete the new client that was just registered
 	if oldClose != nil {
 		oldClose()
 	}
@@ -85,13 +74,10 @@ func (h *Hub) Register(client *Client) {
 
 func (h *Hub) Unregister(client *Client) {
 	h.mu.Lock()
-	// Only delete if the stored client is this exact instance
-	// (not a newer reconnection with same botID)
 	if existing, ok := h.clients[client.BotID]; ok && existing == client {
 		delete(h.clients, client.BotID)
 	}
 	h.mu.Unlock()
-	// Only broadcast offline if we actually removed this client
 	if _, ok := h.clients[client.BotID]; !ok {
 		h.broadcastEvent("user_offline", client.BotID)
 	}
@@ -113,7 +99,6 @@ func (h *Hub) Broadcast(data []byte) {
 		select {
 		case c.send <- data:
 		default:
-			// drop slow client
 		}
 	}
 }
@@ -127,7 +112,6 @@ func (h *Hub) SendToBot(botID string, data []byte) {
 		default:
 		}
 	}
-	// Also try suffix :chat for iframe connections
 	chatID := botID + ":chat"
 	if c, ok := h.clients[chatID]; ok {
 		select {
@@ -157,61 +141,87 @@ func (h *Hub) IsOnline(botID string) bool {
 	return ok
 }
 
-// ── Client read/write pumps ──
+// ── Raw WebSocket pumps (no gorilla) ──
 
-func (c *Client) ReadPump(botIDs []string, handler MessageHandler) {
-	defer func() {
-		c.hub.Unregister(c)
-		c.conn.Close()
-	}()
-
-	c.conn.SetReadLimit(65536)
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
-	})
-
-	for {
-		_, raw, err := c.conn.ReadMessage()
-		if err != nil {
-			break
+func (c *Client) WritePumpRaw() {
+	defer c.raw.Close()
+	for msg := range c.send {
+		l := len(msg)
+		frame := []byte{0x81}
+		if l < 126 {
+			frame = append(frame, byte(l))
+		} else if l < 65536 {
+			frame = append(frame, 126, byte(l>>8), byte(l))
+		} else {
+			frame = append(frame, 127)
+			for i := 7; i >= 0; i-- {
+				frame = append(frame, byte(l>>(i*8)))
+			}
 		}
-		var msg WSMessage
-		if err := json.Unmarshal(raw, &msg); err != nil {
-			continue
-		}
-		if msg.Type == "pong" {
-			continue
-		}
-		if msg.Type == "message" {
-			handler.HandleMessage(c.BotID, msg.Data)
+		frame = append(frame, msg...)
+		if _, err := c.raw.Write(frame); err != nil { log.Printf("[ws] WritePump write error for %s: %v", c.BotID, err)
+			return
 		}
 	}
 }
 
-func (c *Client) WritePump() {
-	ticker := time.NewTicker(30 * time.Second)
+func (c *Client) ReadPumpRaw(handler MessageHandler) {
 	defer func() {
-		ticker.Stop()
-		c.conn.Close()
+		c.hub.Unregister(c)
+		c.raw.Close()
 	}()
 
+	log.Printf("[ws] ReadPump start for %s", c.BotID)
+	buf := make([]byte, 65536)
 	for {
-		select {
-		case msg, ok := <-c.send:
-			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
+		n, err := c.raw.Read(buf[:2])
+		if err != nil || n < 2 {
+			log.Printf("[ws] ReadPump error for %s: %v", c.BotID, err)
+			return
+		}
+		opcode := buf[0] & 0x0F
+		plen := int(buf[1] & 0x7F)
+		masked := buf[1]&0x80 != 0
+
+		if plen == 126 {
+			c.raw.Read(buf[:2])
+			plen = int(buf[0])<<8 | int(buf[1])
+		} else if plen == 127 {
+			c.raw.Read(buf[:8])
+			plen = 0
+			for i := 0; i < 8; i++ {
+				plen = (plen << 8) | int(buf[i])
 			}
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				return
+		}
+
+		var payload []byte
+		if masked {
+			c.raw.Read(buf[:4])
+			mask := buf[:4]
+			payload = make([]byte, plen)
+			c.raw.Read(payload)
+			for i := 0; i < len(payload); i++ {
+				payload[i] ^= mask[i%4]
 			}
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
+		} else {
+			payload = make([]byte, plen)
+			c.raw.Read(payload)
+		}
+
+		if opcode == 8 {
+			return
+		}
+		if opcode == 9 {
+			c.raw.Write([]byte{0x8A, 0x00})
+			continue
+		}
+		if opcode == 1 {
+			var msg WSMessage
+			if err := json.Unmarshal(payload, &msg); err != nil {
+				continue
+			}
+			if msg.Type == "message" {
+				handler.HandleMessage(c.BotID, msg.Data)
 			}
 		}
 	}
@@ -226,30 +236,46 @@ func mustJSON(v any) json.RawMessage {
 	return b
 }
 
-// ServeWS handles WebSocket upgrade
+// ServeWS - raw hijack WebSocket (no gorilla dependency)
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request, botID string, handler MessageHandler) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "hijacking not supported", 500)
+		return
+	}
+	rawConn, _, err := hj.Hijack()
 	if err != nil {
-		log.Printf("[ws] upgrade error: %v", err)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 
+	key := r.Header.Get("Sec-WebSocket-Key")
+	if key == "" {
+		rawConn.Close()
+		return
+	}
+	hash := sha1.Sum([]byte(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+	accept := base64.StdEncoding.EncodeToString(hash[:])
+	fmt.Fprintf(rawConn, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", accept)
+
 	client := &Client{
 		BotID: botID,
-		conn:  conn,
+		raw:   rawConn,
 		hub:   h,
 		send:  make(chan []byte, 256),
 	}
 	h.Register(client)
-	go client.WritePump()
-	// Send a welcome message
+
+	go client.WritePumpRaw()
+
 	hello, _ := json.Marshal(WSMessage{
 		Type: "hello",
 		Data: mustJSON(map[string]string{"bot_id": botID, "msg": fmt.Sprintf("Welcome %s to 12FZ Chat", botID)}),
 	})
 	client.send <- hello
 
-	go client.ReadPump([]string{botID}, handler)
+	go client.ReadPumpRaw(handler)
+	log.Printf("[ws] servews done for %s", botID)
 }
 
 func (h *Hub) ConnectionCount() int {
