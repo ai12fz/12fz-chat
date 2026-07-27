@@ -5,15 +5,16 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"time"	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/ai12fz/12fz-chat/internal/model"
+
 	"github.com/ai12fz/12fz-chat/internal/db"
+	"github.com/ai12fz/12fz-chat/internal/model"
 	"github.com/ai12fz/12fz-chat/internal/ws"
 	"github.com/gorilla/mux"
 )
@@ -718,29 +719,32 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 
 	// Parse model from request
 	var reqBody struct {
-		Model    string `json:"model"`
+		Model    string                   `json:"model"`
 		Messages []map[string]interface{} `json:"messages"`
 	}
 	json.Unmarshal(body, &reqBody)
 
-	// Look up model endpoint from DB
+	// Route to model endpoint from DB
 	models, _ := h.db.ProxyListModels(r.Context())
-	var endpoint, apiKey string
-	modelName := reqBody.Model
+	endpoint := target
+	apiKey := ""
 	for _, m := range models {
-		if m["name"] == modelName && m["status"] == "active" {
-			if ep, ok := m["endpoint"].(string); ok { endpoint = ep }
+		if m["name"] == reqBody.Model && m["status"] == "active" {
+			if ep, ok := m["endpoint"].(string); ok && ep != "" { endpoint = ep }
 			if k, ok := m["api_key"].(string); ok { apiKey = k }
 			break
 		}
 	}
 	if endpoint == "" {
-		// Fallback: use target if no matching model found
-		endpoint = target
+		jsonError(w, "no endpoint for model: "+reqBody.Model, 400)
+		return
 	}
 
 	req, _ := http.NewRequest(r.Method, endpoint, io.NopCloser(strings.NewReader(string(body))))
-	req.Header = r.Header
+	for k, vs := range r.Header {
+		if k == "Authorization" { continue }
+		for _, v := range vs { req.Header.Add(k, v) }
+	}
 	if apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
@@ -766,18 +770,19 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 		} `json:"error"`
 	}
 	json.Unmarshal(respBody, &parsed)
-	if parsed.Model != "" { modelName = parsed.Model }
+	modelName := parsed.Model
+	if modelName == "" { modelName = reqBody.Model }
 	tokenCount := parsed.Usage.TotalTokens
 	if tokenCount == 0 { tokenCount = parsed.Usage.PromptTokens + parsed.Usage.CompletionTokens }
 
-	// Sync log with retry (billing-critical)
+	// Sync log with retry (critical for billing)
 	for attempt := 0; attempt < 2; attempt++ {
-		err2 := h.db.LogProxyUsage(r.Context(), modelName, tokenCount)
-		if err2 == nil { break }
+		e := h.db.LogProxyUsage(r.Context(), modelName, tokenCount)
+		if e == nil { break }
 		if attempt == 1 {
-			log.Printf("[proxy] USAGE LOG FAILED: model=%s tokens=%d err=%v", modelName, tokenCount, err2)
+			log.Printf("[proxy] USAGE DROP: model=%s tokens=%d err=%v", modelName, tokenCount, e)
 		} else {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 
