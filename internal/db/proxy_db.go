@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -244,4 +245,22 @@ func randomHex(n int) string {
 func (d *DB) LogProxyUsage(ctx context.Context, modelName string, tokens int) error {
 	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ('00000000-0000-0000-0000-000000000000', $1, $2, 0, NOW())", modelName, tokens)
 	return err
+}
+
+// GetOrgBalance returns current balance for org
+func (d *DB) GetOrgBalance(ctx context.Context, orgID string) (float64, error) {
+	var bal float64
+	err := d.pool.QueryRow(ctx, "SELECT COALESCE(balance,0) FROM chat.org_balance WHERE org_id=$1", orgID).Scan(&bal)
+	return bal, err
+}
+
+// ConsumeBalance deducts from org balance if sufficient
+func (d *DB) ConsumeBalance(ctx context.Context, orgID string, amount float64) error {
+	tag, err := d.pool.Exec(ctx,
+		"UPDATE chat.org_balance SET balance=balance-, updated_at=NOW() WHERE org_id= AND balance>=", amount, orgID)
+	if err != nil { return err }
+	if tag.RowsAffected() == 0 { return fmt.Errorf("insufficient balance") }
+	// Ledger entry
+	d.pool.Exec(ctx, "INSERT INTO chat.org_ledger (org_id,amount,type,remark) VALUES(,,'consume','token usage')", orgID, amount)
+	return nil
 }

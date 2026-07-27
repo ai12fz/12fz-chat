@@ -713,6 +713,34 @@ func (h *HTTPHandler) ProxyModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, target string) {
+	// ── Balance & Rate Limit ──
+	orgID := "00000000-0000-0000-0000-000000000000" // default org
+	if bid := getBotID(r); bid != "" {
+		if oid, _ := h.db.GetOrgID(r.Context(), parseInt64(bid)); oid != "" {
+			orgID = oid
+		}
+	}
+	balance, _ := h.db.GetOrgBalance(r.Context(), orgID)
+	if balance <= 0 {
+		jsonError(w, "余额不足，请充值", 402)
+		return
+	}
+	var maxRPM float64
+	switch {
+	case balance >= 20:
+		maxRPM = 120
+	case balance >= 10:
+		maxRPM = 30
+	case balance >= 1:
+		maxRPM = 10
+	default:
+		maxRPM = 2
+	}
+	if !getLimiter(orgID).allow(maxRPM) {
+		jsonError(w, "rate limited", 429)
+		return
+	}
+
 	start := time.Now()
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
