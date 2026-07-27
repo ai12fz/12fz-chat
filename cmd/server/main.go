@@ -97,6 +97,7 @@ func main() {
 
 
 	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
+	api.HandleFunc("/friends/{id}/category", httpHandler.UpdateFriendCategory).Methods("PATCH")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 	api.HandleFunc("/agent-status", httpHandler.GetAgentStatus).Methods("GET")

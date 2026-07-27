@@ -306,6 +306,25 @@ func (h *HTTPHandler) AddFriend(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]string{"status": "ok"}, 201)
 }
 
+func (h *HTTPHandler) UpdateFriendCategory(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	friendID := mux.Vars(r)["id"]
+	var req struct{ Category string `json:"category"` }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResp(w, map[string]string{"error": "bad request"}, 400)
+		return
+	}
+	if req.Category == "" {
+		jsonResp(w, map[string]string{"error": "category required"}, 400)
+		return
+	}
+	if err := h.db.UpdateFriendCategory(r.Context(), botID, friendID, req.Category); err != nil {
+		jsonResp(w, map[string]string{"error": err.Error()}, 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
 func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["user_id"]
 	friends, err := h.db.GetFriends(r.Context(), userID)

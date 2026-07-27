@@ -367,7 +367,7 @@ func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, err
 	var friends []model.Friend
 	for rows.Next() {
 		var f model.Friend
-		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.CreatedAt); err != nil {
+		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt); err != nil {
 			return nil, err
 		}
 		friends = append(friends, f)
@@ -419,6 +419,13 @@ func (d *DB) GetFriendMessages(ctx context.Context, userID, otherID string, limi
 	return msgs, nil
 }
 
+
+func (d *DB) UpdateFriendCategory(ctx context.Context, userID, friendID, category string) error {
+	_, err := d.pool.Exec(ctx,
+		"UPDATE chat.friends SET category =  WHERE user_id =  AND friend_id = ",
+		category, userID, friendID)
+	return err
+}
 
 func (d *DB) UpdateFriendStatus(ctx context.Context, userID, friendID, status string) error {
 	_, err := d.pool.Exec(ctx,

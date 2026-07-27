@@ -39,18 +39,22 @@
 
     
     <div class="tab-content" v-show="activeTab === 'agent'">
+      <div class="category-filter">
+        <button :class="{ active: agentCat === '' }" @click="agentCat = ''">全部</button>
+        <button v-for="cat in agentCategories" :key="cat" :class="{ active: agentCat === cat }" @click="agentCat = cat">{{ cat }}</button>
+      </div>
       <nav class="session-list">
-        <div v-for="f in agentFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
+        <div v-for="f in filteredAgentFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
           <div class="session-info">
             <div class="session-top">
               <span class="session-name">{{ f.friend_id }}</span>
-              <span class="session-badge badge-agent">🤖 Agent</span>
+              <span class="session-badge badge-agent">🤖 {{ f.category || "日常" }}</span>
             </div>
             <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>
         </div>
-        <div v-if="agentFriends.length === 0" class="empty-hint">暂无 Agent</div>
+        <div v-if="filteredAgentFriends.length === 0" class="empty-hint">{{ agentCat ? agentCat + '分类下暂无' : '暂无 Agent' }}</div>
       </nav>
     </div>
 
@@ -113,6 +117,9 @@ const activeTab = ref('msg')
 
 const friends = ref<any[]>([])
 const agentFriends = computed(() => friends.value.filter(f => f.user_type === 'agent'))
+const agentCategories = computed(() => [...new Set(agentFriends.value.map(f => f.category || '日常'))])
+const agentCat = ref('')
+const filteredAgentFriends = computed(() => agentCat.value ? agentFriends.value.filter(f => (f.category || '日常') === agentCat.value) : agentFriends.value)
 const nonAgentFriends = computed(() => friends.value.filter(f => f.user_type !== 'agent'))
 const showAddFriend = ref(false)
 const showProfile = ref(false)
@@ -317,6 +324,10 @@ loadFriends()
 }
 .session-badge.badge-agent { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
 .session-badge.badge-device { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
+.category-filter { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; background: #fafafa; border-bottom: 1px solid #eee; }
+.category-filter button { font-size: 11px; padding: 2px 8px; border-radius: 10px; border: 1px solid #d9d9d9; background: #fff; cursor: pointer; color: #666; }
+.category-filter button.active { background: #1890ff; color: #fff; border-color: #1890ff; }
+.category-filter button:hover { border-color: #1890ff; }
 .session-badge.badge-human { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
 .session-msg {
   font-size: 12px;
