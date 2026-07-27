@@ -60,26 +60,42 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) Register(client *Client) {
+	var oldClose func()
 	h.mu.Lock()
-	// Close old connection if bot reconnects
 	if old, ok := h.clients[client.BotID]; ok {
-		close(old.send)
-		old.conn.Close()
+		oldConn := old.conn
+		oldSend := old.send
+		oldClose = func() {
+			close(oldSend)
+			oldConn.Close()
+		}
 	}
 	h.clients[client.BotID] = client
 	h.mu.Unlock()
+
+	// Close old connection OUTSIDE the lock so its Unregister
+	// doesn't delete the new client that was just registered
+	if oldClose != nil {
+		oldClose()
+	}
 
 	h.broadcastEvent("user_online", client.BotID)
 	log.Printf("[ws] %s connected", client.BotID)
 }
 
-func (h *Hub) Unregister(botID string) {
+func (h *Hub) Unregister(client *Client) {
 	h.mu.Lock()
-	delete(h.clients, botID)
+	// Only delete if the stored client is this exact instance
+	// (not a newer reconnection with same botID)
+	if existing, ok := h.clients[client.BotID]; ok && existing == client {
+		delete(h.clients, client.BotID)
+	}
 	h.mu.Unlock()
-
-	h.broadcastEvent("user_offline", botID)
-	log.Printf("[ws] %s disconnected", botID)
+	// Only broadcast offline if we actually removed this client
+	if _, ok := h.clients[client.BotID]; !ok {
+		h.broadcastEvent("user_offline", client.BotID)
+	}
+	log.Printf("[ws] %s disconnected", client.BotID)
 }
 
 func (h *Hub) broadcastEvent(event, botID string) {
@@ -145,7 +161,7 @@ func (h *Hub) IsOnline(botID string) bool {
 
 func (c *Client) ReadPump(botIDs []string, handler MessageHandler) {
 	defer func() {
-		c.hub.Unregister(c.BotID)
+		c.hub.Unregister(c)
 		c.conn.Close()
 	}()
 

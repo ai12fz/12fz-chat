@@ -39,7 +39,7 @@ func main() {
 	hub := ws.NewHub()
 
 	// Init auth handler
-	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.BotTokens)
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, cfg.BotTokens, database)
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
@@ -156,12 +156,34 @@ func main() {
 	r.PathPrefix("/").Handler(httpHandler.StaticHandler())
 
 	// Apply CORS
-	srv := &http.Server{
+		// WS-only server on port 8082 (no timeouts)
+	wsMux := http.NewServeMux()
+	wsMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			http.Error(w, "missing token", 401)
+			return
+		}
+		botID, err := authHandler.ValidateToken(token)
+		if err != nil {
+			http.Error(w, "invalid token: "+err.Error(), 401)
+			return
+		}
+		log.Printf("[chat] WS2 connect: bot_id=%s", botID)
+		hub.ServeWS(w, r, botID, msgHandler)
+	})
+	go func() {
+		wsSrv := &http.Server{Addr: ":8082", Handler: middleware.CORS(wsMux)}
+		log.Printf("WS2 server listening on :8082")
+		wsSrv.ListenAndServe()
+	}()
+
+srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
 		Handler:      middleware.CORS(r),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  0,
+		WriteTimeout: 0,
+		IdleTimeout:  0,
 	}
 
 	// Graceful shutdown

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,17 +10,21 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ai12fz/12fz-chat/internal/db"
 )
 
 type AuthHandler struct {
 	jwtSecret string
 	botTokens map[string]string
+	db        *db.DB
 }
 
-func NewAuthHandler(jwtSecret string, botTokens map[string]string) *AuthHandler {
+func NewAuthHandler(jwtSecret string, botTokens map[string]string, database *db.DB) *AuthHandler {
 	return &AuthHandler{
 		jwtSecret: jwtSecret,
 		botTokens: botTokens,
+		db:        database,
 	}
 }
 
@@ -32,6 +37,14 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 	if strings.HasPrefix(token, "session-") {
 		return token[8:], nil
 	}
+	// Validate device tokens (d_xxx)
+	if strings.HasPrefix(token, "d_") {
+		dev, err := h.db.ValidateDeviceToken(context.Background(), token)
+		if err == nil {
+			return dev.ID, nil
+		}
+	}
+
 	// Validate JWT (from go.12fz.com or local)
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
