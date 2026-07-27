@@ -704,12 +704,12 @@ func (h *HTTPHandler) DeviceSetup(w http.ResponseWriter, r *http.Request) {
 
 // ProxyChat forwards /v1/chat/completions to new-api
 func (h *HTTPHandler) ProxyChat(w http.ResponseWriter, r *http.Request) {
-	h.proxyRequest(w, r, "https://api.deepseek.com/v1/chat/completions")
+	h.proxyRequest(w, r, "http://127.0.0.1:3002/v1/chat/completions")
 }
 
 // ProxyModels forwards /v1/models to new-api
 func (h *HTTPHandler) ProxyModels(w http.ResponseWriter, r *http.Request) {
-	h.proxyRequest(w, r, "https://api.deepseek.com/v1/models")
+	h.proxyRequest(w, r, "http://127.0.0.1:3002/v1/models")
 }
 
 func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, target string) {
@@ -717,13 +717,7 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	defer r.Body.Close()
 	req, _ := http.NewRequest(r.Method, target, io.NopCloser(strings.NewReader(string(body))))
 	req.Header = r.Header
-	// Replace Authorization with deployseek API key
-	model, _ := h.db.ProxyListModels(r.Context())
-	if len(model) > 0 {
-		if key, ok := model[0]["api_key"].(string); ok && key != "" {
-			req.Header.Set("Authorization", "Bearer "+key)
-		}
-	}
+	// Pass through Authorization header (new-api handles auth)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		jsonError(w, "proxy error: "+err.Error(), 502)
