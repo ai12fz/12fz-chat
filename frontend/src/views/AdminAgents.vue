@@ -41,7 +41,7 @@
         </div>
         <div class="form-group"><label>模型</label>
           <select v-model="editAgent.model">
-            <option value="tk.12fz.com">tk.12fz.com (中转)</option>
+            <option value="tk.12fz.com">中转站</option>
             <option value="gpt-4o">GPT-4o</option>
             <option value="gpt-3.5-turbo">GPT-3.5</option>
             <option value="claude-sonnet-4">Claude Sonnet 4</option>
@@ -51,7 +51,7 @@
         </div>
         <div class="form-group"><label>System Prompt</label><textarea v-model="editAgent.system_prompt" rows="4" placeholder="定义 Agent 的角色和行为..."></textarea></div>
         <div class="form-group"><label>API Key</label><input v-model="editAgent.api_key" type="password" placeholder="API 密钥" /></div>
-        <div class="form-group"><label>API URL</label><input v-model="editAgent.api_url" placeholder="如 https://tk.12fz.com/v1" /></div>
+        <div class="form-group"><label>API URL</label><input v-model="editAgent.api_url" placeholder="如 https://ai.12fz.com/v1" /></div>
         <div class="form-group"><label>能力</label>
           <div class="checkbox-group">
             <label v-for="c in ['code','search','terminal','file','web','vision']" :key="c"><input type="checkbox" :value="c" v-model="editAgent.capabilities" /> {{ c }}</label>
@@ -95,7 +95,7 @@ const selectedGroups = ref<number[]>([])
 const saving = ref(false)
 const error = ref('')
 
-const editAgent = ref<any>({ bot_id: '', display_name: '', model: 'tk.12fz.com', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: '' })
+const editAgent = ref<any>({ bot_id: '', display_name: '', model: '中转站', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' })
 
 onMounted(async () => {
   await loadAgents()
@@ -114,7 +114,7 @@ function applyTemplate() {
 }
 
 function openAgent(a?: any) {
-  editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: 'tk.12fz.com', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: '' }
+  editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: '中转站', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' }
   showAgent.value = true; error.value = ''
 }
 
