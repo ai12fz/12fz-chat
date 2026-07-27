@@ -33,6 +33,12 @@
         <h3>{{ editAgent.bot_id ? '编辑' : '新建' }} Agent</h3>
         <div class="form-group"><label>Bot ID</label><input v-model="editAgent.bot_id" :disabled="!!editAgent.bot_id" placeholder="英文标识，如 my-agent" /></div>
         <div class="form-group"><label>显示名</label><input v-model="editAgent.display_name" placeholder="显示名称" /></div>
+        <div class="form-group"><label>分类</label>
+          <select v-model="editAgent.category" @change="applyTemplate">
+            <option value="">选择分类模板</option>
+            <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
         <div class="form-group"><label>模型</label>
           <select v-model="editAgent.model">
             <option value="tk.12fz.com">tk.12fz.com (中转)</option>
@@ -98,6 +104,13 @@ onMounted(async () => {
 
 async function loadAgents() {
   try { const { data } = await api.get('/agents'); agents.value = data || [] } catch(e: any) { error.value = e.response?.data?.error || '加载失败' }
+}
+
+const categories = ['办公','日常','销售','生产','编程','旅游','财务','策划运营','客服','农业','科技','教育','医疗','法律','设计','营销','物流','招聘','餐饮','房产','税务']
+const categoryTemplates: Record<string,{p:string;c:string[]}> = {'办公':{p:'你是企业办公助手。帮助处理文档、会议室、日程、报销等。中文作答。',c:['chat','tools','memory']},'日常':{p:'你是通用日常助手。聊天、查资料、处理简单任务。中文回答。',c:['chat','tools']},'销售':{p:'你是金牌销售助手。客户管理、跟进线索、报价、数据分析。',c:['chat','tools','memory','search']},'生产':{p:'你是生产管理助手。排期、物料、质检、产能分析。',c:['chat','tools','terminal','file']},'编程':{p:'你是高级编程助手。代码审查、debug、架构设计。',c:['code','search','terminal','file','web']},'旅游':{p:'你是旅行规划助手。目的地推荐、行程规划、预算估算。',c:['chat','search','web']},'财务':{p:'你是财务分析助手。报表、预算、成本分析。',c:['chat','tools','file','memory']},'策划运营':{p:'你是策划运营助手。活动策划、内容运营、社群管理。',c:['chat','tools','search','web']},'客服':{p:'你是智能客服。礼貌耐心、解决用户问题、投诉升级。',c:['chat','memory']},'农业':{p:'你是智慧农业助手。种植管理、病虫害、气象预警。',c:['chat','tools','search']},'科技':{p:'你是科技资讯助手。科技动态、论文解读、专利分析。',c:['chat','search','web','tools']},'教育':{p:'你是教育辅导助手。备课、出题、答疑、学习规划。',c:['chat','tools','file','search']},'医疗':{p:'你是医疗知识助手。医学百科、症状自查(不替代医生)。',c:['chat','search']},'法律':{p:'你是法律顾问助手。合同审查、法规查询(不替代律师)。',c:['chat','search','tools','file']},'设计':{p:'你是设计助理。UI方案、配色建议、素材推荐。',c:['chat','web','tools']},'营销':{p:'你是营销策划助手。文案、投放策略、SEO、竞品分析。',c:['chat','tools','web','search']},'物流':{p:'你是物流管理助手。路径优化、仓储管理、运单跟踪。',c:['chat','tools','memory']},'招聘':{p:'你是招聘助手。JD撰写、简历筛选、面试题库。',c:['chat','tools','search','file']},'餐饮':{p:'你是餐饮运营助手。菜单设计、成本核算、排班管理。',c:['chat','tools']},'房产':{p:'你是房产顾问助手。房源匹配、价值评估、政策解读。',c:['chat','search','web','tools']},'税务':{p:'你是税务助手。申报流程、税收筹划、发票管理(不替代税务师)。',c:['chat','tools','file','search']}}
+function applyTemplate() {
+  const t = categoryTemplates[editAgent.value.category]
+  if (t) { editAgent.value.system_prompt = t.p; editAgent.value.capabilities = t.c.slice() }
 }
 
 function openAgent(a?: any) {

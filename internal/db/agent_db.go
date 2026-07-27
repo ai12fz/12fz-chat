@@ -17,6 +17,7 @@ type Agent struct {
 	APIKey       string    `json:"api_key"`
 	APIURL       string    `json:"api_url"`
 	MerchantID   string    `json:"merchant_id"`
+	Category     string    `json:"category"`
 	Capabilities []string  `json:"capabilities"`
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -24,7 +25,7 @@ type Agent struct {
 }
 
 func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, error) {
-	query := "SELECT id, bot_id, display_name, model, system_prompt, capabilities, status, api_key, api_url, merchant_id, created_at, updated_at FROM chat.agents"
+	query := "SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, created_at, updated_at FROM chat.agents"
 	var args []interface{}
 	if len(merchantID) > 0 && merchantID[0] != "" {
 		query += " WHERE merchant_id = $1"
@@ -39,7 +40,7 @@ func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, err
 	var agents []Agent
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		agents = append(agents, a)
@@ -50,9 +51,9 @@ func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, err
 func (d *DB) GetAgent(ctx context.Context, botID string) (*Agent, error) {
 	var a Agent
 	err := d.pool.QueryRow(ctx,
-		"SELECT id, bot_id, display_name, model, system_prompt, capabilities, status, api_key, api_url, merchant_id, created_at, updated_at FROM chat.agents WHERE bot_id = $1",
+		"SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, created_at, updated_at FROM chat.agents WHERE bot_id = $1",
 		botID,
-	).Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (d *DB) GetAgent(ctx context.Context, botID string) (*Agent, error) {
 
 func (d *DB) CreateAgent(ctx context.Context, a *Agent) error {
 	return d.pool.QueryRow(ctx,
-		"INSERT INTO chat.agents (bot_id, display_name, model, system_prompt, capabilities, status, api_key, api_url, merchant_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at, updated_at",
+		"INSERT INTO chat.agents (bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at, updated_at",
 		a.BotID, a.DisplayName, a.Model, a.SystemPrompt, a.Capabilities, a.Status, a.APIKey, a.APIURL, a.MerchantID,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 }
