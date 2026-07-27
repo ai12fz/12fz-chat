@@ -16,7 +16,7 @@
     <div class="key-card">
       <h3>注册码（每设备独立，一次一码）</h3>
       <table v-if="regCodes.length" class="table">
-        <thead><tr><th>注册码</th><th>状态</th><th>设备</th><th>创建</th><th>操作</th></tr></thead>
+        <thead><tr><th>注册码</th><th>状态</th><th>设备</th><th>创建</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="rc in regCodes" :key="rc.code">
             <td><code>{{ rc.code }}</code></td>
@@ -34,7 +34,7 @@
     </div>
 
     <table v-if="devices.length" class="table">
-      <thead><tr><th>设备名</th><th>状态</th><th>Token</th><th>系统</th><th>最后上线</th><th>操作</th></tr></thead>
+      <thead><tr><th>设备名</th><th>状态</th><th>Token</th><th>系统</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="d in devices" :key="d.id">
           <td><span @dblclick="startRename(d)" title="双击改名">{{ d.name }}</span></td>
@@ -42,6 +42,8 @@
           <td><code>{{ (d.token||'').slice(0, 12) }}...</code></td>
           <td>{{ d.os || '—' }}</td>
           <td>{{ fmt(d.last_seen) }}</td>
+          <td><label class="switch"><input type="checkbox" :checked="d.allow_install_skills" @change="toggleSkills(d)"><span class="slider"></span></label></td>
+          <td><label class="switch"><input type="checkbox" :checked="d.allow_install_software" @change="toggleSoftware(d)"><span class="slider"></span></label></td>
           <td><button class="btn-danger" @click="del(d)">删除</button></td>
         </tr>
       </tbody>
@@ -146,4 +148,10 @@ function fmt(t: string) {
 .tag.online { background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .tag.offline { background: #f3f4f6; color: #9ca3af; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .empty { color: #999; padding: 20px; }
+.switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 22px; transition: .3s; }
+.slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+input:checked + .slider { background: #22c55e; }
+input:checked + .slider:before { transform: translateX(18px); }
 </style>

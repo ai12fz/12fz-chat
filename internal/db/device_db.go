@@ -17,7 +17,9 @@ type Device struct {
 	Token     string    `json:"token"`
 	OS        string    `json:"os"`
 	Status    string    `json:"status"`
-	LastSeen  time.Time `json:"last_seen"`
+	LastSeen  time.Time 
+	AllowSkills   bool 
+	AllowSoftware bool `json:"last_seen"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -60,7 +62,7 @@ func (d *DB) ListDevicesByOrg(ctx context.Context, orgID string) ([]Device, erro
 	var devs []Device
 	for rows.Next() {
 		var dev Device
-		if err := rows.Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.Status, &dev.LastSeen, &dev.CreatedAt); err != nil {
+		if err := rows.Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.Status, &dev.LastSeen, &dev.CreatedAt, &dev.AllowSkills, &dev.AllowSoftware); err != nil {
 			return nil, err
 		}
 		devs = append(devs, dev)

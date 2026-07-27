@@ -708,6 +708,11 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 		return
 	}
 	defer resp.Body.Close()
+	// Log usage
+	if err := h.db.LogProxyUsage(context.Background(), "deepseek", 0); err != nil {
+		log.Printf("[proxy] usage log err: %v", err)
+	}
+	h.db.LogProxyUsage(context.Background(), "deepseek", 0)
 	for k, vs := range resp.Header {
 		for _, v := range vs { w.Header().Add(k, v) }
 	}
@@ -856,4 +861,22 @@ func (h *HTTPHandler) resolveOrgFromToken(token string) (string, error) {
 		return "", fmt.Errorf("org not found")
 	}
 	return upstream.Data.UserInfo.OrgID, nil
+}
+
+func (h *HTTPHandler) ToggleDeviceSkills(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+	if err := h.db.ToggleDeviceSkills(r.Context(), deviceID); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
+func (h *HTTPHandler) ToggleDeviceSoftware(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+	if err := h.db.ToggleDeviceSoftware(r.Context(), deviceID); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
 }

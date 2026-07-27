@@ -240,3 +240,8 @@ func randomHex(n int) string {
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+func (d *DB) LogProxyUsage(ctx context.Context, modelName string, tokens int) error {
+	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ('00000000-0000-0000-0000-000000000000', $1, $2, 0, NOW())", modelName, tokens)
+	return err
+}

@@ -37,11 +37,8 @@ onMounted(async () => {
   try {
     // Load groups
     const groups = await getMyGroups()
-    let firstId = ''
-
     if (groups && Array.isArray(groups)) groups.forEach((g: any) => {
       chat.ensureGroupSession(g)
-      if (!firstId) firstId = chat.groupSessionId(g.id)
     })
 
     // Load messages for all groups immediately
@@ -60,7 +57,7 @@ onMounted(async () => {
       } catch(e) { console.error("load error:", e) }
     }
     // Select first session
-    if (firstId) chat.setActive(firstId)
+    // Auto-select handled by SidebarLeft after friends load
   } catch (err) {
     console.error('Failed to load chat data:', err)
   }

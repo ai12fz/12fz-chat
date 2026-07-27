@@ -17,8 +17,8 @@
       <div class="cards">
         <div class="card" v-for="(v, k) in stats" :key="k">
           <div class="card-label">{{ k }}</div>
-          <div class="card-num">{{ v.calls }}<small> 次</small></div>
-          <div class="card-sub">{{ v.tokens }} tk · ¥{{ (v.cost||0).toFixed(2) }}</div>
+          <div class="card-num">{{ v.tokens }}<small> tk</small></div>
+          <div class="card-sub">{{ v.calls }} 次 · ¥{{ (v.cost||0).toFixed(2) }}</div>
         </div>
       </div>
       <div class="chart-box" v-if="chartDates.length">
@@ -244,7 +244,7 @@ th, td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-align: left;
 th { background: #fafafa; font-weight: 500; }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; }
 .card-label { font-size: 13px; color: #888; margin-bottom: 4px; }
-.card-num { font-size: 32px; font-weight: 700; line-height: 1.1; }
+.card-num { font-size: 32px; font-weight: 400; line-height: 1.1; }
 .card-num small { font-size: 14px; font-weight: 400; color: #999; }
 .card-sub { font-size: 13px; color: #666; margin-top: 4px; }
 .chart-box { margin-top: 24px; background: #fff; border-radius: 8px; padding: 20px; }

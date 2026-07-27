@@ -121,6 +121,9 @@ func main() {
 	r.HandleFunc("/api/devices/register", httpHandler.RegisterDevice).Methods("POST")
 	r.HandleFunc("/api/devices/setup", httpHandler.DeviceSetup).Methods("GET")
 	r.HandleFunc("/api/devices/heartbeat", httpHandler.DeviceHeartbeat).Methods("POST")
+	r.HandleFunc("/api/devices/{id}/toggle-skills", httpHandler.ToggleDeviceSkills).Methods("POST")
+	r.HandleFunc("/api/devices/{id}/toggle-software", httpHandler.ToggleDeviceSoftware).Methods("POST")
+
 	r.HandleFunc("/api/skills", httpHandler.ListSkills).Methods("GET")
 	r.HandleFunc("/api/skills/{name}", httpHandler.UpdateSkill).Methods("PUT")
 	r.HandleFunc("/api/skills/{name}", httpHandler.DeleteSkill).Methods("DELETE")
@@ -157,6 +160,15 @@ func main() {
 	})
 
 	// Serve static frontend
+		r.HandleFunc("/api/test-log", func(w http.ResponseWriter, r *http.Request) {
+		err := database.LogProxyUsage(r.Context(), "test-model", 999)
+		if err != nil {
+			w.Write([]byte("err: " + err.Error()))
+		} else {
+			w.Write([]byte("ok"))
+		}
+	}).Methods("GET")
+
 	r.PathPrefix("/").Handler(httpHandler.StaticHandler())
 
 	// Apply CORS

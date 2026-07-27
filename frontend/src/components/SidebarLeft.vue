@@ -80,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
@@ -159,6 +159,11 @@ async function loadFriends() {
         }
       })
     }
+    // Auto-select first friend session
+    nextTick(() => {
+      const friends = chat.sessions.filter(s => s.type !== "group")
+      if (friends.length > 0) chat.setActive(friends[0].id)
+    })
   } catch(e) { console.error('Failed to load friends:', e) }
 }
 

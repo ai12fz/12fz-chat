@@ -48,3 +48,13 @@ func (db *DB) DeleteSkill(ctx context.Context, name string) error {
 	_, err := db.pool.Exec(ctx, `DELETE FROM chat.skills WHERE name=$1`, name)
 	return err
 }
+
+func (db *DB) ToggleDeviceSkills(ctx context.Context, deviceID string) error {
+        _, err := db.pool.Exec(ctx, "UPDATE chat.devices SET allow_install_skills = NOT allow_install_skills WHERE id=$1", deviceID)
+        return err
+}
+
+func (db *DB) ToggleDeviceSoftware(ctx context.Context, deviceID string) error {
+        _, err := db.pool.Exec(ctx, "UPDATE chat.devices SET allow_install_software = NOT allow_install_software WHERE id=$1", deviceID)
+        return err
+}
