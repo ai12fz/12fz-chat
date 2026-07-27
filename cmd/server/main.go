@@ -120,7 +120,7 @@ func main() {
 	api.HandleFunc("/device-reg-codes/{code}", httpHandler.RevokeRegCode).Methods("DELETE")
 	r.HandleFunc("/api/devices/register", httpHandler.RegisterDevice).Methods("POST")
 	r.HandleFunc("/api/devices/setup", httpHandler.DeviceSetup).Methods("GET")
-	r.HandleFunc("/api/devices/heartbeat", httpHandler.DeviceHeartbeat).Methods("POST")
+	api.HandleFunc("/devices/heartbeat", httpHandler.DeviceHeartbeat).Methods("POST")
 	r.HandleFunc("/api/devices/{id}/toggle-skills", httpHandler.ToggleDeviceSkills).Methods("POST")
 	r.HandleFunc("/api/devices/{id}/toggle-software", httpHandler.ToggleDeviceSoftware).Methods("POST")
 
