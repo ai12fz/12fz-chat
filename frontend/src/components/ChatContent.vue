@@ -239,8 +239,8 @@ watch(() => chat.activeId, async () => {
           id: m.id, group_id: 0, sender_id: parseInt(String(m.from_id)),
           content: m.content, msg_type: 'text', created_at: m.created_at
         }))
-        chat.sessions[idx].lastMsg = msgs[msgs.length-1].content
-        chat.sessions[idx].lastMsgAt = msgs[msgs.length-1].created_at
+        chat.sessions[idx].lastMsg = msgs[0].content
+        chat.sessions[idx].lastMsgAt = msgs[0].created_at
         await nextTick()
         msgListRef.value && (msgListRef.value.scrollTop = msgListRef.value.scrollHeight)
       }
