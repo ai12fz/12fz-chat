@@ -77,7 +77,7 @@ func (h *HTTPHandler) StaticHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// For SPA: serve index.html for all non-API, non-WS routes
 		path := r.URL.Path
-		if path == "/" || path == "" {
+		if !strings.HasPrefix(path, "/assets/") && !strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/ws") {
 			http.ServeFile(w, r, "frontend/dist/index.html")
 			return
 		}

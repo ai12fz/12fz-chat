@@ -2,7 +2,7 @@
   <div class="chat-layout">
     <SidebarLeft />
     <ChatContent />
-    <SidebarRight />
+    <AgentStatusPanel />
   </div>
 </template>
 
@@ -16,7 +16,7 @@ import { useWebSocket } from '../composables/useWebSocket'
 import { getMyGroups, getMessages } from '../api'
 import SidebarLeft from '../components/SidebarLeft.vue'
 import ChatContent from '../components/ChatContent.vue'
-import SidebarRight from '../components/SidebarRight.vue'
+// import AgentStatusPanel from '../components/SidebarRight.vue'
 
 const router = useRouter()
 const auth = useAuthStore()

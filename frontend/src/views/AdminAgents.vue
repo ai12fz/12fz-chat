@@ -14,7 +14,11 @@
       <thead><tr><th>Bot ID</th><th>显示名</th><th>模型</th><th>状态</th><th>群聊</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="a in agents" :key="a.bot_id">
-          <td>{{ a.bot_id }}</td><td>{{ a.display_name }}</td><td>{{ a.model }}</td>
+          <td>{{ a.bot_id }}</td><td>{{ a.display_name }}</td><td>
+            <select :value="a.model" @change="changeModel(a, $event.target.value)" style="font-size:12px;padding:2px 4px;border:1px solid #d9d9d9;border-radius:4px">
+              <option v-for="m in proxyModels" :key="m.id" :value="m.name">{{ m.display_name || m.name }}</option>
+            </select>
+          </td>
           <td><span class="status-tag" :class="a.status">{{ a.status }}</span></td>
           <td>{{ a.group_count || 0 }} 个群</td>
           <td>
@@ -73,13 +77,8 @@
             </select>
           </div>
           <div class="form-group"><label>模型</label>
-            <select v-model="editAgent.model">
-              <option value="tk.12fz.com">中转站</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-3.5-turbo">GPT-3.5</option>
-              <option value="claude-sonnet-4">Claude Sonnet 4</option>
-              <option value="deepseek-v3">DeepSeek V3</option>
-              <option value="qwen-max">Qwen Max</option>
+            <span style="font-size:12px;margin-right:6px">{{ a.model }}</span><select v-model="editAgent.model">
+              <option v-for="m in proxyModels" :key="m.id" :value="m.name">{{ m.display_name || m.name }}</option>
             </select>
           </div>
           <div class="form-group"><label>System Prompt</label><textarea v-model="editAgent.system_prompt" rows="4" placeholder="定义 Agent 的角色和行为..."></textarea></div>
@@ -90,7 +89,7 @@
               <label v-for="c in ['code','search','terminal','file','web','vision']" :key="c"><input type="checkbox" :value="c" v-model="editAgent.capabilities" /> {{ c }}</label>
             </div>
           </div>
-          <div class="form-group"><label>状态</label><select v-model="editAgent.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+          <div class="form-group"><label>状态</label><span style="font-size:12px;margin-right:6px">{{ a.model }}</span><select v-model="editAgent.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
           <div v-if="error" class="error">{{ error }}</div>
           <div class="modal-btns">
             <button @click="showAgent = false">取消</button>
@@ -135,18 +134,35 @@ const selectedAgent = ref<any>(null)
 const selectedGroups = ref<number[]>([])
 const saving = ref(false)
 const error = ref('')
+const proxyModels = ref<any[]>([])
+async function loadProxyModels() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const resp = await fetch('/admin/proxy/models', { headers: { Authorization: token } })
+    if (resp.ok) proxyModels.value = await resp.json()
+  } catch {}
+}
 const agentTab = ref('quick')
 const installCmd = ref('')
 
-const editAgent = ref<any>({ bot_id: '', display_name: '', model: '中转站', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' })
+const editAgent = ref<any>({ bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' })
 
 onMounted(async () => {
+  await loadProxyModels()
   await loadAgents()
   try { const { data } = await api.get('/groups/my'); groups.value = data || [] } catch {}
 })
 
+async function changeModel(agent: any, newModel: string) {
+  try {
+    await api.put('/agents/' + agent.bot_id, { ...agent, model: newModel })
+    agent.model = newModel
+  } catch(e: any) { alert('修改失败: ' + (e.response?.data?.error || e.message)) }
+}
+
 async function loadAgents() {
-  try { const { data } = await api.get('/agents'); agents.value = data || [] } catch(e: any) { error.value = e.response?.data?.error || '加载失败' }
+  try { const { data } = await api.get('/agents'); agents.value = data || []
+} catch(e: any) { error.value = e.response?.data?.error || '加载失败' }
 }
 
 const categories = ['办公','日常','销售','生产','编程','旅游','财务','策划运营','客服','农业','科技','教育','医疗','法律','设计','营销','物流','招聘','餐饮','房产','税务']
@@ -165,7 +181,7 @@ async function saveQuickAgent() {
   const body = {
     bot_id: a.bot_id || 'agent-' + Date.now(),
     display_name: a.display_name,
-    model: a.model || 'tk.12fz.com',
+    model: a.model || 'deepseek-v4-flash',
     system_prompt: t ? t.p : (a.system_prompt || ''),
     capabilities: t ? t.c : (a.capabilities || []),
     category: a.category,
@@ -185,7 +201,7 @@ async function saveQuickAgent() {
 function copyText(t: string) { navigator.clipboard.writeText(t).then(() => alert('已复制')) }
 
 function openAgent(a?: any) {
-  editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: '中转站', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' }
+  editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' }
   showAgent.value = true; error.value = ''
 }
 

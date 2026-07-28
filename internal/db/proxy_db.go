@@ -243,7 +243,25 @@ func randomHex(n int) string {
 }
 
 func (d *DB) LogProxyUsage(ctx context.Context, modelName string, tokens int) error {
-	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ('00000000-0000-0000-0000-000000000000', $1, $2, 0, NOW())", modelName, tokens)
+	// Calculate cost from pricing
+	var cost float64
+	var priceAmount float64
+	// Try output pricing first: model_<name>_output
+	d.pool.QueryRow(ctx,
+		"SELECT COALESCE(amount,0) FROM chat.proxy_pricing WHERE key LIKE 'model_' || $1 || '_output' AND active=true", modelName).Scan(&priceAmount)
+	if priceAmount == 0 {
+		// Fallback: model_<name>_input
+		d.pool.QueryRow(ctx,
+			"SELECT COALESCE(amount,0) FROM chat.proxy_pricing WHERE key LIKE 'model_' || $1 || '_input' AND active=true", modelName).Scan(&priceAmount)
+	}
+	if priceAmount > 0 {
+		var multiplier float64
+		d.pool.QueryRow(ctx, "SELECT COALESCE(amount,2) FROM chat.proxy_pricing WHERE key='pricing_multiplier'").Scan(&multiplier)
+		if multiplier == 0 { multiplier = 2 }
+		// priceAmount is per 1000 tokens
+		cost = float64(tokens) / 1000.0 * priceAmount * multiplier
+	}
+	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ('00000000-0000-0000-0000-000000000000', $1, $2, $3, NOW())", modelName, tokens, cost)
 	return err
 }
 

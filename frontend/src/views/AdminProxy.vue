@@ -38,6 +38,23 @@
           </div>
         </div>
       </div>
+      <!-- 近30天消耗金额 -->
+      <div class="chart-box" v-if="costDates.length">
+        <h4>近30天 消耗金额（按模型）</h4>
+        <div class="chart-wrap" style="position:relative">
+          <div class="bar-chart">
+            <div class="bar-col" v-for="d in costDates" :key="'c'+d">
+              <div class="bar-stack">
+                <div v-for="(seg, i) in (costMap[d]||[])" :key="i"
+                  class="bar-seg" :style="{ height: ((seg.cost / costMax) * 120).toFixed(1) + 'px', background: seg.color }"
+                  :title="seg.model+': ¥'+seg.cost.toFixed(2)"></div>
+              </div>
+              <span class="bar-label">{{ d.slice(5) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Models -->
@@ -145,6 +162,22 @@ const stats = ref<any>({})
 const dailyData = ref<any[]>([])
 const chartDates = ref<string[]>([])
 const chartMap = ref<Record<string,any[]>>({})
+const costDates = ref<string[]>([])
+const costMap = ref<Record<string,any[]>>({})
+const costMax = ref(1)
+function buildCostChart(daily) {
+  const mc = {}
+  let ci = 0
+  const dateMap = {}
+  for (const r of daily) {
+    if (!mc[r.model]) mc[r.model] = MODEL_COLORS[ci++ % MODEL_COLORS.length]
+    if (!dateMap[r.date]) dateMap[r.date] = []
+    dateMap[r.date].push({ model: r.model, cost: r.cost || 0, color: mc[r.model] })
+  }
+  costDates.value = Object.keys(dateMap).sort()
+  costMap.value = dateMap
+  costMax.value = Math.max(0.01, ...daily.map(function(r) { return r.cost || 0 }))
+}
 const chartMax = ref(1)
 const refValue = ref(0)
 const refLineY = ref(40)
@@ -205,6 +238,7 @@ watch(tab, async t => {
     rulerLabel.value = lastTotal >= 1000 ? (lastTotal/1000).toFixed(1)+'k' : String(lastTotal)
     rulerY.value = 34 + (lastTotal / chartMax.value) * 140
   }
+  buildCostChart(dailyData.value)
 }
   if (t === 'models') models.value = await call('/admin/proxy/models')
   if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
