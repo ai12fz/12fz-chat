@@ -7,6 +7,7 @@
 </template>
 
 <script setup lang="ts">
+import AgentStatusPanel from '../components/AgentStatusPanel.vue'
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'

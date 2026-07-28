@@ -53,6 +53,29 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([])
   const activeId = ref<string>('')
   const connected = ref(false)
+  const agentStatuses = ref<Record<string, any[]>>({})  // deviceId -> status entries
+
+  function addAgentStatus(from: string, data: any) {
+    if (!agentStatuses.value[from]) {
+      agentStatuses.value[from] = []
+    }
+    agentStatuses.value[from].push({
+      ...data,
+      time: Date.now()
+    })
+    // Keep last 20 entries
+    if (agentStatuses.value[from].length > 20) {
+      agentStatuses.value[from].shift()
+    }
+  }
+
+  function clearAgentStatus(from?: string) {
+    if (from) {
+      delete agentStatuses.value[from]
+    } else {
+      agentStatuses.value = {}
+    }
+  }
 
   const activeSession = computed(() =>
     sessions.value.find(s => s.id === activeId.value)
@@ -167,6 +190,10 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
+    agentStatuses,
+    setConnected,
+    addAgentStatus,
+    clearAgentStatus,
     sessions, activeId, activeSession, connected,
     groupSessionId, ensureGroupSession,
     addSession, setActive, receiveMessage, loadMessages,

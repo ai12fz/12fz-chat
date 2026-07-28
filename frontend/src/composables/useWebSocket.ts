@@ -65,6 +65,9 @@ export function useWebSocket() {
             }
             break
           }
+          case 'agent_status':
+            handleAgentStatus(pkt.data, pkt.from)
+            break
           case 'event':
             handleEvent(pkt.data)
             break
@@ -95,6 +98,10 @@ export function useWebSocket() {
     if (data.event === 'user_online' || data.event === 'user_offline') {
       console.log(`[ws] ${data.bot_id} ${data.event}`)
     }
+  }
+
+  function handleAgentStatus(data: any, from: string) {
+    store.addAgentStatus(from, data)
   }
 
   /** Send a text message via WebSocket */
