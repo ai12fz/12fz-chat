@@ -577,6 +577,11 @@ func (h *HTTPHandler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "bot_id and display_name required", 400)
 		return
 	}
+	// Check duplicate name
+	if exists, err := h.db.AgentNameExists(r.Context(), a.DisplayName); err == nil && exists {
+		jsonError(w, "Agent name already exists", 409)
+		return
+	}
 	if a.Status == "" {
 		a.Status = "active"
 	}

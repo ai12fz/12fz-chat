@@ -91,6 +91,13 @@ func (d *DB) UpdateAgent(ctx context.Context, botID string, a *Agent) error {
 	return err
 }
 
+// AgentNameExists checks if display_name already exists
+func (d *DB) AgentNameExists(ctx context.Context, name string) (bool, error) {
+	var exists bool
+	err := d.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM chat.agents WHERE display_name=$1)", name).Scan(&exists)
+	return exists, err
+}
+
 func (d *DB) DeleteAgent(ctx context.Context, botID string) error {
 	_, err := d.pool.Exec(ctx, "DELETE FROM chat.agents WHERE bot_id = $1", botID)
 	return err
