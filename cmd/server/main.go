@@ -159,7 +159,7 @@ func main() {
 			return
 		}
 		log.Printf("[chat] WS connect: bot_id=%s", botID)
-		hub.ServeWS(w, r, botID, msgHandler)
+		hub.ServeWSGorilla(w, r, botID, msgHandler)
 	})
 
 	// Serve static frontend
@@ -197,7 +197,7 @@ srv := &http.Server{
 				botID, err := authHandler.ValidateToken(token)
 				if err != nil { http.Error(w, "invalid token", 401); return }
 				log.Printf("[chat] WS connect: bot_id=%s", botID)
-				hub.ServeWS(w, req, botID, msgHandler)
+				hub.ServeWSGorilla(w, req, botID, msgHandler)
 				return
 			}
 			r.ServeHTTP(w, req)

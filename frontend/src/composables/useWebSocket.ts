@@ -66,7 +66,8 @@ export function useWebSocket() {
             break
           }
           case 'agent_status':
-            handleAgentStatus(pkt.data, pkt.from)
+            console.log('[ws] agent_status from=' + pkt.from, pkt.data)
+            handleAgentStatus(pkt.data, pkt.data.from || pkt.from)
             break
           case 'event':
             handleEvent(pkt.data)

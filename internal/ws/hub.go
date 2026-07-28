@@ -334,6 +334,13 @@ func (h *Hub) ServeWSGorilla(w http.ResponseWriter, r *http.Request, botID strin
 			log.Printf("[ws] read error for %s: %v", botID, err)
 			break
 		}
+		var wsMsg WSMessage
+		if e := json.Unmarshal(msg, &wsMsg); e == nil && wsMsg.Type == "agent_status" {
+			m := map[string]interface{}{"from": botID}
+			json.Unmarshal(wsMsg.Data, &m)
+			pkt, _ := json.Marshal(WSMessage{Type: "agent_status", Data: mustJSON(m)})
+			h.Broadcast(pkt)
+		}
 		msgHandler.HandleMessage(botID, msg)
 	}
 	conn.Close()
