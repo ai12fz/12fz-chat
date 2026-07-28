@@ -101,6 +101,7 @@ func main() {
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
 	api.HandleFunc("/agent-status", httpHandler.GetAgentStatus).Methods("GET")
+
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
 	api.HandleFunc("/users/{id}", httpHandler.GetUserInfo).Methods("GET")
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
@@ -164,12 +165,18 @@ func main() {
 
 	// Serve static frontend
 		r.HandleFunc("/api/test-log", func(w http.ResponseWriter, r *http.Request) {
-		err := database.LogProxyUsage(r.Context(), "test-model", 999)
+		_, err := database.LogProxyUsage(r.Context(), "00000000-0000-0000-0000-000000000000", "test-model", 999)
 		if err != nil {
 			w.Write([]byte("err: " + err.Error()))
 		} else {
 			w.Write([]byte("ok"))
 		}
+	}).Methods("GET")
+
+	// Hermes bridge script (public download)
+	r.HandleFunc("/hermes-bridge.py", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.ServeFile(w, r, "static/hermes-bridge.py")
 	}).Methods("GET")
 
 	r.PathPrefix("/").Handler(httpHandler.StaticHandler())

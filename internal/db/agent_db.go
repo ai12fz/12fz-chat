@@ -2,7 +2,10 @@ package db
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"time"
+	"fmt"
 
 	"github.com/ai12fz/12fz-chat/internal/model"
 )
@@ -20,12 +23,14 @@ type Agent struct {
 	Category     string    `json:"category"`
 	Capabilities []string  `json:"capabilities"`
 	Status       string    `json:"status"`
+	AgentType    string    `json:"agent_type"`
+	Token        string    `json:"token"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, error) {
-	query := "SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, created_at, updated_at FROM chat.agents"
+	query := "SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), created_at, updated_at FROM chat.agents"
 	var args []interface{}
 	if len(merchantID) > 0 && merchantID[0] != "" {
 		query += " WHERE merchant_id = $1"
@@ -40,7 +45,7 @@ func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, err
 	var agents []Agent
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.AgentType, &a.Token, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		agents = append(agents, a)
@@ -51,9 +56,9 @@ func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, err
 func (d *DB) GetAgent(ctx context.Context, botID string) (*Agent, error) {
 	var a Agent
 	err := d.pool.QueryRow(ctx,
-		"SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, created_at, updated_at FROM chat.agents WHERE bot_id = $1",
+		"SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), created_at, updated_at FROM chat.agents WHERE bot_id = $1",
 		botID,
-	).Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.AgentType, &a.Token, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -61,16 +66,27 @@ func (d *DB) GetAgent(ctx context.Context, botID string) (*Agent, error) {
 }
 
 func (d *DB) CreateAgent(ctx context.Context, a *Agent) error {
+	// 自动生成 token
+	if a.Token == "" {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			return fmt.Errorf("generate token: %w", err)
+		}
+		a.Token = "sk-" + hex.EncodeToString(b)
+	}
+	if a.AgentType == "" {
+		a.AgentType = "api"
+	}
 	return d.pool.QueryRow(ctx,
-		"INSERT INTO chat.agents (bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, created_at, updated_at",
-		a.BotID, a.DisplayName, a.Model, a.SystemPrompt, a.Category, a.Capabilities, a.Status, a.APIKey, a.APIURL, a.MerchantID,
+		"INSERT INTO chat.agents (bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, agent_type, token) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id, created_at, updated_at",
+		a.BotID, a.DisplayName, a.Model, a.SystemPrompt, a.Category, a.Capabilities, a.Status, a.APIKey, a.APIURL, a.MerchantID, a.AgentType, a.Token,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 }
 
 func (d *DB) UpdateAgent(ctx context.Context, botID string, a *Agent) error {
 	_, err := d.pool.Exec(ctx,
-		"UPDATE chat.agents SET display_name=$1, model=$2, system_prompt=$3, capabilities=$4, status=$5, api_key=$7, api_url=$8, merchant_id=$9, updated_at=NOW() WHERE bot_id=$6",
-		a.DisplayName, a.Model, a.SystemPrompt, a.Capabilities, a.Status, botID, a.APIKey, a.APIURL, a.MerchantID,
+		"UPDATE chat.agents SET display_name=$1, model=$2, system_prompt=$3, capabilities=$4, status=$5, api_key=$7, api_url=$8, merchant_id=$9, agent_type=COALESCE(NULLIF($10,''), agent_type), updated_at=NOW() WHERE bot_id=$6",
+		a.DisplayName, a.Model, a.SystemPrompt, a.Capabilities, a.Status, botID, a.APIKey, a.APIURL, a.MerchantID, a.AgentType,
 	)
 	return err
 }

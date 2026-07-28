@@ -242,7 +242,7 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-func (d *DB) LogProxyUsage(ctx context.Context, modelName string, tokens int) error {
+func (d *DB) LogProxyUsage(ctx context.Context, orgID, modelName string, tokens int) (float64, error) {
 	// Calculate cost from pricing
 	var cost float64
 	var priceAmount float64
@@ -261,8 +261,8 @@ func (d *DB) LogProxyUsage(ctx context.Context, modelName string, tokens int) er
 		// priceAmount is per 1000 tokens
 		cost = float64(tokens) / 1000.0 * priceAmount * multiplier
 	}
-	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ('00000000-0000-0000-0000-000000000000', $1, $2, $3, NOW())", modelName, tokens, cost)
-	return err
+	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ($1, $2, $3, $4, NOW())", orgID, modelName, tokens, cost)
+	return cost, err
 }
 
 // GetOrgBalance returns current balance for org
@@ -275,10 +275,10 @@ func (d *DB) GetOrgBalance(ctx context.Context, orgID string) (float64, error) {
 // ConsumeBalance deducts from org balance if sufficient
 func (d *DB) ConsumeBalance(ctx context.Context, orgID string, amount float64) error {
 	tag, err := d.pool.Exec(ctx,
-		"UPDATE chat.org_balance SET balance=balance-, updated_at=NOW() WHERE org_id= AND balance>=", amount, orgID)
+		"UPDATE chat.org_balance SET balance=balance-$1, updated_at=NOW() WHERE org_id=$2 AND balance>=$1", amount, orgID)
 	if err != nil { return err }
 	if tag.RowsAffected() == 0 { return fmt.Errorf("insufficient balance") }
 	// Ledger entry
-	d.pool.Exec(ctx, "INSERT INTO chat.org_ledger (org_id,amount,type,remark) VALUES(,,'consume','token usage')", orgID, amount)
+	d.pool.Exec(ctx, "INSERT INTO chat.org_ledger (org_id,amount,type,remark) VALUES($1,$2,'consume','token usage')", orgID, amount)
 	return nil
 }

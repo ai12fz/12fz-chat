@@ -735,6 +735,24 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 			break
 		}
 	}
+	// === BILLING: extract org_id from client API key ===
+	orgID := "00000000-0000-0000-0000-000000000000" // fallback
+	clientKey := ExtractTokenFromHeader(r)
+	if strings.HasPrefix(clientKey, "sk-") {
+		if oid, err := h.db.ValidateAPIKey(r.Context(), clientKey); err == nil {
+			orgID = oid
+		}
+	}
+
+	// === BILLING: pre-check balance ===
+	if orgID != "00000000-0000-0000-0000-000000000000" {
+		bal, err := h.db.GetOrgBalance(r.Context(), orgID)
+		if err == nil && bal <= 0 {
+			jsonError(w, "insufficient balance", 402)
+			return
+		}
+	}
+
 	if endpoint == "" {
 		jsonError(w, "no endpoint for model: "+reqBody.Model, 400)
 		return
@@ -776,13 +794,20 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	if tokenCount == 0 { tokenCount = parsed.Usage.PromptTokens + parsed.Usage.CompletionTokens }
 
 	// Sync log with retry (critical for billing)
+	var billingCost float64
 	for attempt := 0; attempt < 2; attempt++ {
-		e := h.db.LogProxyUsage(r.Context(), modelName, tokenCount)
-		if e == nil { break }
+		c, e := h.db.LogProxyUsage(r.Context(), orgID, modelName, tokenCount)
+		if e == nil { billingCost = c; break }
 		if attempt == 1 {
 			log.Printf("[proxy] USAGE DROP: model=%s tokens=%d err=%v", modelName, tokenCount, e)
 		} else {
 			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	// Deduct balance if real org
+	if billingCost > 0 && orgID != "00000000-0000-0000-0000-000000000000" {
+		if err := h.db.ConsumeBalance(r.Context(), orgID, billingCost); err != nil {
+			log.Printf("[proxy] BALANCE DEDUCT FAIL: org=%s cost=%.4f err=%v", orgID, billingCost, err)
 		}
 	}
 
