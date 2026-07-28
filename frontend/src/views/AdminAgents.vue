@@ -11,10 +11,12 @@
     </div>
 
     <table v-if="agents.length">
-      <thead><tr><th>Bot ID</th><th>显示名</th><th>模型</th><th>状态</th><th>群聊</th><th>操作</th></tr></thead>
+      <thead><tr><th>Bot ID</th><th>显示名</th><th>类型</th><th>模型</th><th>状态</th><th>群聊</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="a in agents" :key="a.bot_id">
-          <td>{{ a.bot_id }}</td><td>{{ a.display_name }}</td><td>
+          <td>{{ a.bot_id }}</td><td>{{ a.display_name }}</td>
+          <td><span :class="'type-tag type-' + (a.agent_type || 'api')">{{ a.agent_type === 'hermes' ? 'Hermes' : 'API' }}</span></td>
+          <td>
             <select :value="a.model" @change="changeModel(a, $event.target.value)" style="font-size:12px;padding:2px 4px;border:1px solid #d9d9d9;border-radius:4px">
               <option v-for="m in proxyModels" :key="m.id" :value="m.name">{{ m.display_name || m.name }}</option>
             </select>
@@ -45,6 +47,12 @@
         <!-- Quick Config -->
         <div v-show="agentTab==='quick'">
           <div class="form-group"><label>显示名称 *</label><input v-model="editAgent.display_name" placeholder="如：销售助手" /></div>
+          <div class="form-group"><label>类型 *</label>
+            <select v-model="editAgent.agent_type">
+              <option value="api">API — 中转站标准 Agent（走模型计费）</option>
+              <option value="hermes">Hermes — 商户自建 Agent（Hermes 桥接）</option>
+            </select>
+          </div>
           <div class="form-group"><label>分类 *</label>
             <select v-model="editAgent.category" @change="applyTemplate">
               <option value="">选择分类</option>
@@ -60,16 +68,28 @@
             <button class="btn-primary" @click="saveQuickAgent" :disabled="saving">{{ saving ? '创建中...' : '创建 Agent' }}</button>
           </div>
           <div v-if="installCmd" style="margin-top:12px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;padding:12px">
-            <div style="font-size:13px;color:#52c41a;margin-bottom:6px">✅ Agent 创建成功！在终端执行以下命令安装：</div>
+            <div style="font-size:13px;color:#52c41a;margin-bottom:6px">✅ Agent 创建成功！</div>
+            <div v-if="createdToken" style="margin-bottom:8px">
+              <div style="font-size:12px;color:#555;margin-bottom:4px">🔑 Token（请妥善保存，仅显示一次）：</div>
+              <code style="display:block;background:#fff;padding:8px;border-radius:4px;font-size:12px;word-break:break-all;overflow-x:auto">{{ createdToken }}</code>
+              <button style="margin-top:4px;font-size:12px" @click="copyText(createdToken)">📋 复制 Token</button>
+            </div>
+            <div style="font-size:12px;color:#555;margin-bottom:4px">📦 {{ editAgent.agent_type === 'hermes' ? 'Hermes 桥接安装命令：' : '安装命令：' }}</div>
             <code style="display:block;background:#fff;padding:8px;border-radius:4px;font-size:12px;word-break:break-all;overflow-x:auto">{{ installCmd }}</code>
-            <button style="margin-top:8px;font-size:12px" @click="copyText(installCmd)">📋 复制命令</button>
+            <button style="margin-top:4px;font-size:12px" @click="copyText(installCmd)">📋 复制命令</button>
           </div>
         </div>
 
-        <!-- Custom Config (existing form, hidden when quick) -->
+        <!-- Custom Config -->
         <div v-show="agentTab==='custom'">
           <div class="form-group"><label>Bot ID</label><input v-model="editAgent.bot_id" :disabled="!!editAgent.bot_id" placeholder="英文标识，如 my-agent" /></div>
           <div class="form-group"><label>显示名</label><input v-model="editAgent.display_name" placeholder="显示名称" /></div>
+          <div class="form-group"><label>类型</label>
+            <select v-model="editAgent.agent_type">
+              <option value="api">API — 中转站标准 Agent</option>
+              <option value="hermes">Hermes — 商户自建 Agent</option>
+            </select>
+          </div>
           <div class="form-group"><label>分类</label>
             <select v-model="editAgent.category" @change="applyTemplate">
               <option value="">选择分类模板</option>
@@ -77,7 +97,7 @@
             </select>
           </div>
           <div class="form-group"><label>模型</label>
-            <span style="font-size:12px;margin-right:6px">{{ a.model }}</span><select v-model="editAgent.model">
+            <select v-model="editAgent.model">
               <option v-for="m in proxyModels" :key="m.id" :value="m.name">{{ m.display_name || m.name }}</option>
             </select>
           </div>
@@ -89,7 +109,10 @@
               <label v-for="c in ['code','search','terminal','file','web','vision']" :key="c"><input type="checkbox" :value="c" v-model="editAgent.capabilities" /> {{ c }}</label>
             </div>
           </div>
-          <div class="form-group"><label>状态</label><span style="font-size:12px;margin-right:6px">{{ a.model }}</span><select v-model="editAgent.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+          <div class="form-group"><label>状态</label><select v-model="editAgent.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+          <div v-if="editAgent.token" style="background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;padding:8px;margin-top:8px">
+            <div style="font-size:12px;color:#52c41a">🔑 Token: <code style="background:#fff;padding:2px 6px;border-radius:3px">{{ editAgent.token }}</code></div>
+          </div>
           <div v-if="error" class="error">{{ error }}</div>
           <div class="modal-btns">
             <button @click="showAgent = false">取消</button>
@@ -100,7 +123,7 @@
     </div>
 
     <!-- Groups Modal -->
-        <div v-if="showGroups" class="modal-overlay" @click.self="showGroups = false">
+    <div v-if="showGroups" class="modal-overlay" @click.self="showGroups = false">
       <div class="modal">
         <h3>{{ selectedAgent?.display_name }} — 群聊绑定</h3>
         <div v-if="groups.length" class="group-list">
@@ -118,13 +141,56 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 async function request(url: string, opts: any = {}) {
-  const token = localStorage.token || 'session-1'
-  opts.headers = { ...opts.headers, Authorization: 'Bearer ' + token }
+  const token = localStorage.getItem('token') || localStorage.token || 'session-1'
+  opts.headers = { 'Content-Type': 'application/json', ...opts.headers, Authorization: 'Bearer ' + token }
   const r = await fetch(url, opts)
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}))
+    throw new Error(j.error || `HTTP ${r.status}`)
+  }
   return r.json()
 }
 
-import api from '../api'
+async function apiGet(path: string) {
+  const token = localStorage.getItem('token') || ''
+  const r = await fetch('/api' + path, { headers: { Authorization: 'Bearer ' + token } })
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('未登录，请先登录后再访问')
+    const j = await r.json().catch(() => ({}))
+    throw new Error(j.error || r.statusText)
+  }
+  return r.json()
+}
+async function apiPut(path: string, body: any) {
+  const token = localStorage.getItem('token') || ''
+  const r = await fetch('/api' + path, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(body) })
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('未登录，请先登录后再访问')
+    const j = await r.json().catch(() => ({}))
+    throw new Error(j.error || r.statusText)
+  }
+  return r.json()
+}
+async function apiPost(path: string, body: any) {
+  const token = localStorage.getItem('token') || ''
+  const r = await fetch('/api' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(body) })
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('未登录，请先登录后再访问')
+    const j = await r.json().catch(() => ({}))
+    throw new Error(j.error || r.statusText)
+  }
+  return r.json()
+}
+async function apiDel(path: string) {
+  const token = localStorage.getItem('token') || ''
+  const r = await fetch('/api' + path, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } })
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('未登录，请先登录后再访问')
+    const j = await r.json().catch(() => ({}))
+    throw new Error(j.error || r.statusText)
+  }
+  return r.json()
+}
 
 const agents = ref<any[]>([])
 const groups = ref<any[]>([])
@@ -138,31 +204,32 @@ const proxyModels = ref<any[]>([])
 async function loadProxyModels() {
   try {
     const token = localStorage.getItem('token') || ''
-    const resp = await fetch('/admin/proxy/models', { headers: { Authorization: token } })
+    const resp = await fetch('/admin/proxy/models', { headers: { Authorization: 'Bearer ' + token } })
     if (resp.ok) proxyModels.value = await resp.json()
   } catch {}
 }
 const agentTab = ref('quick')
 const installCmd = ref('')
+const createdToken = ref('')
 
-const editAgent = ref<any>({ bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' })
+const editAgent = ref<any>({ bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1', agent_type: 'api' })
 
 onMounted(async () => {
   await loadProxyModels()
   await loadAgents()
-  try { const { data } = await api.get('/groups/my'); groups.value = data || [] } catch {}
+  try { const { data } = await apiGet('/groups/my'); groups.value = data || [] } catch {}
 })
 
 async function changeModel(agent: any, newModel: string) {
   try {
-    await api.put('/agents/' + agent.bot_id, { ...agent, model: newModel })
+    await apiPut('/agents/' + agent.bot_id, { ...agent, model: newModel })
     agent.model = newModel
-  } catch(e: any) { alert('修改失败: ' + (e.response?.data?.error || e.message)) }
+  } catch(e: any) { alert('修改失败: ' + (e.message || '未知错误')) }
 }
 
 async function loadAgents() {
-  try { const { data } = await api.get('/agents'); agents.value = data || []
-} catch(e: any) { error.value = e.response?.data?.error || '加载失败' }
+  try { const { data } = await apiGet('/agents'); agents.value = data || []
+} catch(e: any) { error.value = e.message || '加载失败' }
 }
 
 const categories = ['办公','日常','销售','生产','编程','旅游','财务','策划运营','客服','农业','科技','教育','医疗','法律','设计','营销','物流','招聘','餐饮','房产','税务']
@@ -176,6 +243,7 @@ async function saveQuickAgent() {
   const a = editAgent.value
   if (!a.display_name) { error.value = '请输入显示名称'; return }
   if (!a.category) { error.value = '请选择分类'; return }
+  if (!a.agent_type) { error.value = '请选择类型'; return }
   error.value = ''; saving.value = true
   const t = categoryTemplates[a.category]
   const body = {
@@ -187,12 +255,18 @@ async function saveQuickAgent() {
     category: a.category,
     status: 'active',
     api_key: a.api_key || '',
-    api_url: a.api_url || 'https://ai.12fz.com/v1'
+    api_url: a.api_url || 'https://ai.12fz.com/v1',
+    agent_type: a.agent_type || 'api'
   }
   try {
     const res = await request('/api/agents', { method: 'POST', body: JSON.stringify(body) })
-    showAgent.value = false
-    installCmd.value = 'curl -s https://ai.12fz.com/install-agent.sh | bash -s -- --bot-id=' + body.bot_id + ' --token=YOUR_TOKEN'
+    // 不关闭弹窗，先展示 Token 和安装命令
+    createdToken.value = res.token || ''
+    if (res.agent_type === 'hermes') {
+      installCmd.value = `sudo curl -s -o /usr/local/bin/12fz-hermes-bridge https://ai.12fz.com/hermes-bridge.py && sudo chmod +x /usr/local/bin/12fz-hermes-bridge && mkdir -p ~/.hermes && cat > ~/.hermes/12fz-bridge.json << 'HEREOF'\n{"bot_id":"${res.bot_id}","token":"${res.token}","ws_url":"wss://ai.12fz.com/ws","user_id":"1"}\nHEREOF\n/usr/local/bin/12fz-hermes-bridge &`
+    } else {
+      installCmd.value = `curl -s https://ai.12fz.com/install-agent.sh | bash -s -- --bot-id=${res.bot_id} --token=${res.token}`
+    }
     await loadAgents()
   } catch(e: any) { error.value = e.message || '创建失败' }
   saving.value = false
@@ -201,35 +275,35 @@ async function saveQuickAgent() {
 function copyText(t: string) { navigator.clipboard.writeText(t).then(() => alert('已复制')) }
 
 function openAgent(a?: any) {
-  editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1' }
-  showAgent.value = true; error.value = ''
+  editAgent.value = a ? { ...a } : { bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1', agent_type: 'api' }
+  showAgent.value = true; error.value = ''; installCmd.value = ''; createdToken.value = ''
 }
 
 async function saveAgent() {
   saving.value = true; error.value = ''
   try {
-    if (editAgent.value.bot_id) await api.put(`/agents/${encodeURIComponent(editAgent.value.bot_id)}`, editAgent.value)
-    else await api.post('/agents', editAgent.value)
+    if (editAgent.value.bot_id) await apiPut(`/agents/${encodeURIComponent(editAgent.value.bot_id)}`, editAgent.value)
+    else await apiPost('/agents', editAgent.value)
     showAgent.value = false; await loadAgents()
-  } catch(e: any) { error.value = e.response?.data?.error || '保存失败' }
+  } catch(e: any) { error.value = e.message || '保存失败' }
   finally { saving.value = false }
 }
 
 async function deleteAgent(a: any) {
   if (confirm(`确认删除 Agent "${a.display_name}"？`)) {
-    try { await api.delete(`/agents/${encodeURIComponent(a.bot_id)}`); await loadAgents() } catch(e: any) { alert(e.response?.data?.error || '删除失败') }
+    try { await apiDel(`/agents/${encodeURIComponent(a.bot_id)}`); await loadAgents() } catch(e: any) { alert(e.message || '删除失败') }
   }
 }
 
 async function openGroups(a: any) {
   selectedAgent.value = a
-  try { const { data } = await api.get(`/agents/${encodeURIComponent(a.bot_id)}/groups`); selectedGroups.value = (data || []).map((g: any) => g.id) } catch { selectedGroups.value = [] }
+  try { const { data } = await apiGet(`/agents/${encodeURIComponent(a.bot_id)}/groups`); selectedGroups.value = (data || []).map((g: any) => g.id) } catch { selectedGroups.value = [] }
   showGroups.value = true
 }
 
 async function saveGroupBinding() {
   if (!selectedAgent.value) return
-  try { await api.put(`/agents/${encodeURIComponent(selectedAgent.value.bot_id)}/groups`, { group_ids: selectedGroups.value }) } catch(e: any) { alert(e.response?.data?.error || '保存群聊绑定失败') }
+  try { await apiPut(`/agents/${encodeURIComponent(selectedAgent.value.bot_id)}/groups`, { group_ids: selectedGroups.value }) } catch(e: any) { alert(e.response?.data?.error || '保存群聊绑定失败') }
 }
 </script>
 
@@ -247,6 +321,9 @@ th { background: #fafafa; font-weight: 500; }
 .status-tag { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .status-tag.active { background: #f6ffed; color: #52c41a; }
 .status-tag.inactive { background: #fff2f0; color: #f5222d; }
+.type-tag { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.type-tag.type-api { background: #e6f7ff; color: #1890ff; }
+.type-tag.type-hermes { background: #f9f0ff; color: #722ed1; }
 .empty { text-align: center; color: #999; padding: 48px; }
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.3); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .modal { background: #fff; border-radius: 8px; padding: 24px; width: 520px; max-width: 90vw; max-height: 80vh; overflow-y: auto; }
@@ -257,10 +334,8 @@ th { background: #fafafa; font-weight: 500; }
 .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .checkbox-group label { font-size: 13px; cursor: pointer; }
 
-
 .tab-btn.active { color: #1890ff !important; border-bottom-color: #1890ff !important; font-weight: 600; }
 .tab-btn:not(.active):hover { color: #1890ff; }
-
 
 .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .error { color: #f5222d; font-size: 13px; margin-top: 8px; }
