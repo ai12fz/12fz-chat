@@ -228,7 +228,7 @@ async function changeModel(agent: any, newModel: string) {
 }
 
 async function loadAgents() {
-  try { const { data } = await apiGet('/agents'); agents.value = data || []
+  try { const data = await apiGet('/agents'); agents.value = data || []
 } catch(e: any) { error.value = e.message || '加载失败' }
 }
 
