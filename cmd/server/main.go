@@ -115,6 +115,7 @@ func main() {
 	api.HandleFunc("/friends/action", httpHandler.HandleFriendRequest).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.SendFriendMessage).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.GetFriendMessages).Methods("GET")
+	api.HandleFunc("/device-command", httpHandler.DeviceCommand).Methods("POST")
 
 	// LLM proxy to new-api
 	r.HandleFunc("/v1/chat/completions", httpHandler.ProxyChat).Methods("POST", "OPTIONS")

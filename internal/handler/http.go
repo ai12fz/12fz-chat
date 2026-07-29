@@ -695,6 +695,25 @@ func (h *HTTPHandler) GenerateRegCode(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]interface{}{"code": code, "install_cmd": "curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=" + code}, 201)
 }
 
+func (h *HTTPHandler) DeviceCommand(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		BotID string `json:"bot_id"`
+		Cmd   string `json:"cmd"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BotID == "" || req.Cmd == "" {
+		jsonError(w, "bot_id and cmd required", 400)
+		return
+	}
+	cmdID := fmt.Sprintf("%d", time.Now().UnixNano())
+	msg, _ := json.Marshal(ws.WSMessage{
+		Type: "command",
+		Data: mustJSON(map[string]string{"id": cmdID, "cmd": req.Cmd}),
+	})
+	log.Printf("[cmd] sending to %s: %s", req.BotID, req.Cmd)
+	h.hub.SendToBot(req.BotID, msg)
+	jsonResp(w, map[string]string{"status": "sent", "cmd_id": cmdID}, 200)
+}
+
 func (h *HTTPHandler) DeviceSetup(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
