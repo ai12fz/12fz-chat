@@ -379,7 +379,7 @@ func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, err
 	var friends []model.Friend
 	for rows.Next() {
 		var f model.Friend
-		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt, &f.Name, &f.Name); err != nil {
+		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt, &f.Name); err != nil {
 			return nil, err
 		}
 		friends = append(friends, f)
