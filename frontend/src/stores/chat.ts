@@ -53,6 +53,22 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([])
   const activeId = ref<string>('')
   const connected = ref(false)
+  // Poll REST API for agent status
+  setInterval(async () => {
+    try {
+      // Use the friends list to get agent IDs
+      const ids = ['agent-1785267337061'] // hardcoded for gong3
+      for (const botId of ids) {
+        const resp = await fetch('/api/agent-status?bot_id=' + botId)
+        if (!resp.ok) continue
+        const data = await resp.json()
+        if (data.status === 'online' || data.message) {
+          addAgentStatus(botId, data)
+        }
+      }
+    } catch(e) {}
+  }, 5000)
+
   const agentStatuses = ref<Record<string, any[]>>({})  // deviceId -> status entries
 
   function addAgentStatus(from: string, data: any) {

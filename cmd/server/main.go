@@ -34,6 +34,11 @@ func main() {
 	}
 	log.Println("[chat] db ready")
 
+	// Reset all device statuses to offline — only WebSocket connection sets online
+	if err := database.ResetDeviceStatus(ctx); err != nil {
+		log.Printf("[chat] reset device status: %v", err)
+	}
+
 	// Init hub
 	hub := ws.NewHubWithDB(database)
 

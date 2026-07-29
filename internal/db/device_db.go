@@ -46,7 +46,7 @@ func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*D
 func (d *DB) ValidateDeviceToken(ctx context.Context, token string) (*Device, error) {
 	var dev Device
 	err := d.pool.QueryRow(ctx,
-		"UPDATE chat.devices SET last_seen=NOW(), status='online' WHERE token=$1 RETURNING id, name, org_id, token, os, status, last_seen, created_at",
+		"UPDATE chat.devices SET last_seen=NOW() WHERE token=$1 RETURNING id, name, org_id, token, os, status, last_seen, created_at",
 		token,
 	).Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.Status, &dev.LastSeen, &dev.CreatedAt)
 	return &dev, err
@@ -176,9 +176,27 @@ func (db *DB) StoreAPIKey(ctx context.Context, key, token string) error {
 		fmt.Sprintf("INSERT INTO tokens (key, name, user_id, status, remain_quota, unlimited_quota) VALUES ('%s', '%s', 1, 1, 100000, true) ON CONFLICT (key) DO NOTHING", key, "device-"+token[:8]))
 	return cmd.Run()
 }
-// UpdateDeviceLastSeen updates device online timestamp
+// SetDeviceOnline updates device status to online in DB
+func (db *DB) SetDeviceOnline(ctx context.Context, deviceID string) error {
+	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET status='online', last_seen=NOW() WHERE id=$1", deviceID)
+	return err
+}
+
+// SetDeviceOffline updates device status to offline in DB
+func (db *DB) SetDeviceOffline(ctx context.Context, deviceID string) error {
+	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET status='offline' WHERE id=$1", deviceID)
+	return err
+}
+
+// UpdateDeviceLastSeen updates device online timestamp (heartbeat only, does NOT change status)
 func (db *DB) UpdateDeviceLastSeen(ctx context.Context, deviceID string) error {
-	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW(), status='online' WHERE id=$1", deviceID)
+	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW() WHERE id=$1", deviceID)
+	return err
+}
+
+// ResetDeviceStatus resets all device statuses to offline (called at server startup)
+func (db *DB) ResetDeviceStatus(ctx context.Context) error {
+	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET status='offline'")
 	return err
 }
 

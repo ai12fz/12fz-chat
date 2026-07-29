@@ -265,20 +265,47 @@ func (d *DB) LogProxyUsage(ctx context.Context, orgID, modelName string, tokens 
 	return cost, err
 }
 
-// GetOrgBalance returns current balance for org
+// GetAgentModelAny finds agent model by key, then by org, then globally
+func (d *DB) GetAgentModelAny(ctx context.Context, keyText string, orgID string) (string, string, error) {
+	var model, gotOrg string
+	// Strategy 1: exact key match
+	err := d.pool.QueryRow(ctx,
+		"SELECT COALESCE(a.model,''), COALESCE(a.merchant_id,'') FROM chat.agents a WHERE (a.api_key=$1 OR a.token=$1) AND a.status='active' LIMIT 1", keyText).Scan(&model, &gotOrg)
+	if err == nil && model != "" {
+		return model, gotOrg, nil
+	}
+	// Strategy 2: match by org_id (for keys that validate but don't match agent directly)
+	if orgID != "" && orgID != "00000000-0000-0000-0000-000000000000" {
+		err = d.pool.QueryRow(ctx,
+			"SELECT COALESCE(a.model,''), COALESCE(a.merchant_id,'') FROM chat.agents a WHERE a.merchant_id=$1 AND a.status='active' AND a.model != '' LIMIT 1", orgID).Scan(&model, &gotOrg)
+		if err == nil && model != "" {
+			return model, gotOrg, nil
+		}
+	}
+	// Strategy 3: for super admin, find any agent by display_name that has a model
+	err = d.pool.QueryRow(ctx,
+		"SELECT COALESCE(a.model,''), COALESCE(a.merchant_id,'') FROM chat.agents a WHERE a.status='active' AND a.model != '' ORDER BY updated_at DESC LIMIT 1").Scan(&model, &gotOrg)
+	return model, gotOrg, err
+}
+
+// GetOrgBalance returns current balance for org from platform_finance_ledger
 func (d *DB) GetOrgBalance(ctx context.Context, orgID string) (float64, error) {
 	var bal float64
-	err := d.pool.QueryRow(ctx, "SELECT COALESCE(balance,0) FROM chat.org_balance WHERE org_id=$1", orgID).Scan(&bal)
+	err := d.pool.QueryRow(ctx, `SELECT
+		COALESCE(SUM(CASE WHEN direction='in' THEN amount_cny ELSE 0 END), 0) -
+		COALESCE(SUM(CASE WHEN direction='out' THEN amount_cny ELSE 0 END), 0)
+		FROM platform_finance_ledger
+		WHERE org_id=$1 AND biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit') AND status='completed'`, orgID).Scan(&bal)
 	return bal, err
 }
 
-// ConsumeBalance deducts from org balance if sufficient
+// ConsumeBalance writes a consume record to platform_finance_ledger
 func (d *DB) ConsumeBalance(ctx context.Context, orgID string, amount float64) error {
-	tag, err := d.pool.Exec(ctx,
-		"UPDATE chat.org_balance SET balance=balance-$1, updated_at=NOW() WHERE org_id=$2 AND balance>=$1", amount, orgID)
+	bal, err := d.GetOrgBalance(ctx, orgID)
 	if err != nil { return err }
-	if tag.RowsAffected() == 0 { return fmt.Errorf("insufficient balance") }
-	// Ledger entry
-	d.pool.Exec(ctx, "INSERT INTO chat.org_ledger (org_id,amount,type,remark) VALUES($1,$2,'consume','token usage')", orgID, amount)
-	return nil
+	if bal < amount { return fmt.Errorf("insufficient balance") }
+	txID := "ai_" + randomHex(8)
+	_, err = d.pool.Exec(ctx, `INSERT INTO platform_finance_ledger (org_id, tx_no, direction, amount, amount_cny, biz_type, tx_time, status)
+		VALUES ($1, $2, 'out', $3, $3, 'ai_consume', now(), 'completed')`, orgID, txID, amount)
+	return err
 }

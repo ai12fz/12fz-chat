@@ -299,7 +299,7 @@ func (h *HTTPHandler) AddFriend(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "bad request", 400)
 		return
 	}
-	if err := h.db.AddFriend(r.Context(), req.UserID, req.FriendID); err != nil {
+	if err := h.db.AddFriend(r.Context(), req.UserID, req.FriendID, "human"); err != nil {
 		jsonError(w, err.Error(), 500)
 		return
 	}
@@ -595,6 +595,7 @@ func (h *HTTPHandler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), 500)
 		return
 	}
+	_ = h.db.AddFriend(r.Context(), "1", a.BotID, "agent")
 	jsonResp(w, a, 201)
 }
 

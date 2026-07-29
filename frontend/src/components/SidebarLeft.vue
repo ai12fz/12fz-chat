@@ -41,13 +41,14 @@
 <div class="tab-content" v-show="activeTab === 'friends'">
       <nav class="session-list">
         <div v-for="f in friends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
-          <span class="avatar sm" :style="{ background: avatarColor({name: f.friend_id}) }">{{ f.friend_id[0] }}</span>
+          <span class="avatar sm" :style="{ background: avatarColor({name: f.name || f.friend_id}) }">{{ (f.name || f.friend_id)[0] }}</span>
           <div class="session-info">
             <div class="session-top">
-              <span class="session-name">{{ f.friend_id }}</span>
-              <span v-if="f.user_type === 'agent'" class="session-badge badge-agent">🤖 Agent</span>
-              <span v-else-if="f.user_type === 'human'" class="session-badge badge-human">👤 人工</span>
+              <span class="session-name">{{ f.name || f.friend_id }}</span>
+              <span v-if="f.user_type === 'agent' || f.user_type === 'api'" class="session-badge badge-agent">🤖 Agent</span>
+              <span v-else-if="f.user_type === 'human'" class="session-badge badge-human">👤 好友</span>
               <span v-else-if="f.user_type === 'device'" class="session-badge badge-device">🖥 主机</span>
+              <span v-else class="session-badge badge-human">👤 好友</span>
             </div>
             <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>

@@ -51,6 +51,8 @@ type Hub struct {
 
 type DB interface {
 	UpdateDeviceLastSeen(ctx context.Context, deviceID string) error
+	SetDeviceOnline(ctx context.Context, deviceID string) error
+	SetDeviceOffline(ctx context.Context, deviceID string) error
 }
 
 func NewHub() *Hub {
@@ -68,18 +70,32 @@ func (h *Hub) Register(client *Client) {
 
 	h.broadcastEvent("user_online", client.BotID)
 	log.Printf("[ws] %s connected", client.BotID)
+
+	// Update DB status to online if hub has DB access
+	if h.db != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := h.db.SetDeviceOnline(ctx, client.BotID); err != nil {
+			log.Printf("[ws] set online error for %s: %v", client.BotID, err)
+		}
+	}
 }
 
 func (h *Hub) Unregister(client *Client) {
 	h.mu.Lock()
-	if existing, ok := h.clients[client.BotID]; ok && existing == client {
-		delete(h.clients, client.BotID)
-	}
+	delete(h.clients, client.BotID)
 	h.mu.Unlock()
-	if _, ok := h.clients[client.BotID]; !ok {
-		h.broadcastEvent("user_offline", client.BotID)
-	}
+	h.broadcastEvent("user_offline", client.BotID)
 	log.Printf("[ws] %s disconnected", client.BotID)
+
+	// Update DB status to offline if hub has DB access
+	if h.db != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := h.db.SetDeviceOffline(ctx, client.BotID); err != nil {
+			log.Printf("[ws] set offline error for %s: %v", client.BotID, err)
+		}
+	}
 }
 
 func (h *Hub) broadcastEvent(event, botID string) {

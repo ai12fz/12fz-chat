@@ -162,6 +162,11 @@ type MessageResult struct {
 
 // ── Message ──
 
+func (d *DB) Exec(ctx context.Context, sql string, args ...interface{}) error {
+	_, err := d.pool.Exec(ctx, sql, args...)
+	return err
+}
+
 func (d *DB) SaveMessage(ctx context.Context, m *model.Message) error {
 	err := d.pool.QueryRow(ctx,
 		"INSERT INTO chat.messages (group_id, sender_id, content, msg_type) VALUES ($1, $2, $3, $4) RETURNING id, created_at",
@@ -349,16 +354,16 @@ func (d *DB) AutoFriendDevice(ctx context.Context, deviceName, deviceID string) 
 	return err
 }
 
-func (d *DB) AddFriend(ctx context.Context, userID, friendID string) error {
+func (d *DB) AddFriend(ctx context.Context, userID, friendID, userType string) error {
 	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.friends (user_id, friend_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING",
-		userID, friendID)
+		"INSERT INTO chat.friends (user_id, friend_id, status, user_type) VALUES ($1, $2, 'accepted', $3) ON CONFLICT (user_id, friend_id) DO UPDATE SET user_type = $3",
+		userID, friendID, userType)
 	return err
 }
 
 func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at FROM chat.friends f LEFT JOIN chat_agents a ON f.friend_id = a.id WHERE f.user_id = $1",
+		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at, COALESCE(a.display_name, d.name, f.friend_id) as name FROM chat.friends f LEFT JOIN chat.agents a ON f.friend_id = a.bot_id LEFT JOIN chat.devices d ON f.friend_id = d.id WHERE f.user_id = $1",
 		userID)
 	if err != nil {
 		return nil, err
@@ -367,7 +372,7 @@ func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, err
 	var friends []model.Friend
 	for rows.Next() {
 		var f model.Friend
-		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt); err != nil {
+		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt, &f.Name, &f.Name); err != nil {
 			return nil, err
 		}
 		friends = append(friends, f)
@@ -442,6 +447,14 @@ func (d *DB) DeleteFriend(ctx context.Context, userID, friendID string) error {
 
 
 // GetBotStatus returns the current status of a bot/agent
+func (d *DB) UpdateBotStatus(botID, status string) {
+	if d != nil && d.pool != nil {
+		d.pool.Exec(context.Background(),
+			"INSERT INTO chat.bot_statuses (bot_id, status, updated_at) VALUES (, , NOW()) ON CONFLICT (bot_id) DO UPDATE SET status=, updated_at=NOW()",
+			botID, status)
+	}
+}
+
 func (d *DB) GetBotStatus(ctx context.Context, botID string) (map[string]interface{}, error) {
 	sql := `SELECT bot_id, status, COALESCE(current_task_id, ''), COALESCE(current_task_title, ''), COALESCE(message, ''), heartbeat_at, updated_at FROM chat.bot_statuses WHERE bot_id=$1`
 	row := d.pool.QueryRow(ctx, sql, botID)
