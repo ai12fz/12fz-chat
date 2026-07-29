@@ -347,10 +347,17 @@ func (d *DB) GetUnreadCountForUser(ctx context.Context, botID string) (map[int64
 
 // ── Friend ──
 
-func (d *DB) AutoFriendDevice(ctx context.Context, deviceName, deviceID string) error {
+func (d *DB) GetOrgAdminID(ctx context.Context, orgID string) (string, error) {
+	var userID string
+	err := d.platformPool.QueryRow(ctx,
+		"SELECT user_id::text FROM org_user WHERE org_id = $1 AND is_owner = true LIMIT 1", orgID).Scan(&userID)
+	return userID, err
+}
+
+func (d *DB) AutoFriendDevice(ctx context.Context, userID, deviceName string) error {
 	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.friends (user_id, friend_id, status, user_type) VALUES ('1', $1, 'accepted', 'device') ON CONFLICT (user_id, friend_id) DO UPDATE SET status='accepted'",
-		deviceName)
+		"INSERT INTO chat.friends (user_id, friend_id, status, user_type) VALUES ($1, $2, 'accepted', 'device') ON CONFLICT (user_id, friend_id) DO UPDATE SET status='accepted'",
+		userID, deviceName)
 	return err
 }
 

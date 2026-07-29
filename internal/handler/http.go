@@ -595,7 +595,8 @@ func (h *HTTPHandler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), 500)
 		return
 	}
-	_ = h.db.AddFriend(r.Context(), "1", a.BotID, "agent")
+	// Auto-add agent as friend for the creating user
+	h.db.AddFriend(r.Context(), getBotID(r), a.BotID, "agent")
 	jsonResp(w, a, 201)
 }
 
@@ -670,8 +671,13 @@ func (h *HTTPHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid or used registration code: "+err.Error(), 400)
 		return
 	}
-		// Auto-add device as friend for org admin
-	h.db.AutoFriendDevice(r.Context(), dev.Name, dev.ID)
+	// Auto-add device as friend for org admin
+	if adminID, err := h.db.GetOrgAdminID(r.Context(), dev.OrgID); err == nil {
+		h.db.AutoFriendDevice(r.Context(), adminID, dev.Name)
+	} else {
+		// Fallback: friend the super admin
+		h.db.AutoFriendDevice(r.Context(), "1", dev.Name)
+	}
 	jsonResp(w, dev, 201)
 }
 
