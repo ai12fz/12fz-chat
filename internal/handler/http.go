@@ -413,6 +413,22 @@ func (h *HTTPHandler) ListCapabilities(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateSkill adds a new skill
+func (h *HTTPHandler) ListCapabilities(w http.ResponseWriter, r *http.Request) {
+	var orgID string
+	if mid := getBotID(r); mid != "" {
+		// Use device's org from auth context
+		orgID = r.URL.Query().Get("org_id")
+	}
+	if orgID == "" {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
+	caps, err := h.db.ListCapabilities(r.Context(), orgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, caps, 200)
+}
 func (h *HTTPHandler) CreateSkill(w http.ResponseWriter, r *http.Request) {
 	var s map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
