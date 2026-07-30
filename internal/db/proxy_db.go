@@ -141,7 +141,7 @@ func (d *DB) ProxyListMerchants(ctx context.Context) ([]map[string]interface{}, 
 		COALESCE(SUM(CASE WHEN l.direction='out' THEN l.amount_cny ELSE 0 END), 0) as total_used,
 		(SELECT COUNT(*) FROM chat.proxy_keys k WHERE k.org_id = l.org_id AND k.status='active') as key_count
 		FROM platform_finance_ledger l
-		WHERE l.biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit') AND l.status='completed'
+		WHERE l.biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit','recharge','mall_order','payment') AND l.status='completed'
 		GROUP BY l.org_id
 		HAVING COALESCE(SUM(CASE WHEN l.direction='in' THEN l.amount_cny ELSE 0 END), 0) > 0
 		ORDER BY balance DESC`)
@@ -173,7 +173,7 @@ func (d *DB) ProxyRechargeMerchant(ctx context.Context, orgID string, amount flo
 
 func (d *DB) ProxyMerchantLedger(ctx context.Context, orgID string) ([]map[string]interface{}, error) {
 	rows, err := d.pool.Query(ctx, `SELECT direction, amount_cny, biz_type, created_at
-		FROM platform_finance_ledger WHERE org_id=$1 AND biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit')
+		FROM platform_finance_ledger WHERE org_id=$1 AND biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit','recharge','mall_order','payment')
 		ORDER BY created_at DESC LIMIT 100`, orgID)
 	if err != nil {
 		return nil, err
@@ -295,7 +295,7 @@ func (d *DB) GetOrgBalance(ctx context.Context, orgID string) (float64, error) {
 		COALESCE(SUM(CASE WHEN direction='in' THEN amount_cny ELSE 0 END), 0) -
 		COALESCE(SUM(CASE WHEN direction='out' THEN amount_cny ELSE 0 END), 0)
 		FROM platform_finance_ledger
-		WHERE org_id=$1 AND biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit') AND status='completed'`, orgID).Scan(&bal)
+		WHERE org_id=$1 AND biz_type IN ('ai_recharge','ai_consume','ai_model','trial_credit','recharge','mall_order','payment') AND status='completed'`, orgID).Scan(&bal)
 	return bal, err
 }
 

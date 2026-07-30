@@ -58,3 +58,22 @@ func (db *DB) ToggleDeviceSoftware(ctx context.Context, deviceID string) error {
         _, err := db.pool.Exec(ctx, "UPDATE chat.devices SET allow_install_software = NOT allow_install_software WHERE id=$1", deviceID)
         return err
 }
+
+// ListCapabilities returns tools + skills for an org
+func (db *DB) ListCapabilities(ctx context.Context, orgID string) ([]map[string]interface{}, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, type, name, icon, description FROM chat.capabilities
+		 WHERE org_id=$1 OR org_id=$2
+		 ORDER BY type, id`, orgID, "00000000-0000-0000-0000-000000000000")
+	if err != nil { return nil, err }
+	defer rows.Close()
+	var out []map[string]interface{}
+	for rows.Next() {
+		var id int; var typ, name, icon, desc string
+		if err := rows.Scan(&id, &typ, &name, &icon, &desc); err != nil { continue }
+		out = append(out, map[string]interface{}{
+			"id": id, "type": typ, "name": name, "icon": icon, "description": desc,
+		})
+	}
+	return out, nil
+}

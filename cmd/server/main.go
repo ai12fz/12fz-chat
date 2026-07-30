@@ -135,6 +135,7 @@ func main() {
 	r.HandleFunc("/api/devices/activity", httpHandler.PostDeviceActivity).Methods("POST")
 
 	r.HandleFunc("/api/skills", httpHandler.ListSkills).Methods("GET")
+	r.HandleFunc("/api/capabilities", httpHandler.ListCapabilities).Methods("GET")
 	r.HandleFunc("/api/skills/{name}", httpHandler.UpdateSkill).Methods("PUT")
 	r.HandleFunc("/api/skills/{name}", httpHandler.DeleteSkill).Methods("DELETE")
 		r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")

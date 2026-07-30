@@ -57,7 +57,7 @@ export const useChatStore = defineStore('chat', () => {
   setInterval(async () => {
     try {
       // Use the friends list to get agent IDs
-      const ids = ['agent-1785267337061'] // hardcoded for gong3
+      const ids = ['agent-1785267337061', 'hermes-win-qiuming']
       for (const botId of ids) {
         const resp = await fetch('/api/agent-status?bot_id=' + botId)
         if (!resp.ok) continue
@@ -72,6 +72,11 @@ export const useChatStore = defineStore('chat', () => {
   const agentStatuses = ref<Record<string, any[]>>({})  // deviceId -> status entries
 
   function addAgentStatus(from: string, data: any) {
+    // {p:"d"} = done/clear
+    if (data.p === 'd') {
+      delete agentStatuses.value[from]
+      return
+    }
     if (!agentStatuses.value[from]) {
       agentStatuses.value[from] = []
     }
@@ -136,8 +141,12 @@ export const useChatStore = defineStore('chat', () => {
     if (s) {
       s.unread = 0
       activeId.value = id
+      localStorage.setItem('hermes_active_session', id)
     }
   }
+
+  // Clear stale active session on page load; auto-select will set the right one
+  localStorage.removeItem('hermes_active_session')
 
   /** Add a received message to a session */
   function receiveMessage(msg: BackendMessage) {

@@ -109,17 +109,17 @@ const userId = computed(() => localStorage.getItem('user_id') || auth.user?.user
 const sortedSessions = computed(() => {
   return [...chat.sessions]
     .filter(function(s: any) {
-      // Only show sessions that have messages or have been explicitly opened
+      // Always show friend/device sessions; groups only if they have messages
+      if (s.type === 'friend') return true
       var hasContent = s.messages && s.messages.length > 0
       var hasLastMsg = s.lastMsgAt && s.lastMsgAt !== ''
       return hasContent || hasLastMsg
     })
     .sort(function(a,b){
-      // 好友和设备排在群前面
-      var aIsGroup = a.type === 'group'
-      var bIsGroup = b.type === 'group'
-      if (aIsGroup !== bIsGroup) return aIsGroup ? 1 : -1
-      // 同类型按最后消息时间倒序
+      // Active session always at top
+      if (a.id === chat.activeId) return -1
+      if (b.id === chat.activeId) return 1
+      // Rest sorted by lastMsgAt descending (most recent first)
       var at = a.lastMsgAt || ''
       var bt = b.lastMsgAt || ''
       if (at > bt) return -1
@@ -152,21 +152,25 @@ async function loadFriends() {
     friends.value = Array.isArray(res) ? res.map(function(f){ if (!f.display_name) f.display_name = f.friend_id; return f }) : []
     // Auto-create sessions for all friends so sidebar shows them after refresh
     if (Array.isArray(friends.value)) {
-      friends.value.forEach(function(f: any) {
+      friends.value.forEach(function(f: any, i: number) {
         const sid = 'friend:' + f.friend_id
         if (!chat.sessions.find(function(s: any) { return s.id === sid })) {
+          // Stagger timestamps: last friend in list gets newest time
+          const d = new Date()
+          d.setSeconds(d.getSeconds() - (friends.value.length - 1 - i) * 10)
           chat.sessions.push({
             id: sid, name: f.display_name || f.friend_id, type: 'friend',
             userType: f.user_type || 'human',
-            messages: [], members: [], lastMsg: '', lastMsgAt: new Date().toISOString()
+            messages: [], members: [], lastMsg: '', lastMsgAt: d.toISOString()
           })
         }
       })
     }
-    // Auto-select first friend session
+    // Auto-select topmost session; clear stale localStorage
     nextTick(() => {
-      const friends = chat.sessions.filter(s => s.type !== "group")
-      if (friends.length > 0) chat.setActive(friends[0].id)
+      const top = chat.sessions.filter(s => s.type !== "group")
+        .sort((a: any, b: any) => (a.lastMsgAt > b.lastMsgAt) ? -1 : 1)
+      if (top.length > 0) chat.setActive(top[0].id)
     })
   } catch(e) { console.error('Failed to load friends:', e) }
 }
