@@ -11,7 +11,15 @@
       </div>
 
       <!-- Messages -->
-      <div class="message-list" ref="msgListRef">
+      <div
+        class="message-list"
+        ref="msgListRef"
+        :class="{ 'drag-over': dragOver }"
+        @dragenter.prevent="onDragEnter"
+        @dragover.prevent="onDragOver"
+        @dragleave.prevent="onDragLeave"
+        @drop.prevent="onDrop"
+      >
         <div v-for="msg in session.messages" :key="msg.id" class="message-row">
           <div v-if="String(msg.sender_id) === String(auth.userId)" class="message self">
             <div class="msg-body">
@@ -37,7 +45,7 @@
       <div class="chat-input-area">
         <div class="toolbar">
           <button class="tool-btn" @click="showEmoji = !showEmoji" title="表情">😊</button>
-          <button class="tool-btn" @click="selectFile" title="文件">📁</button>
+          <button class="tool-btn" @click="selectFile" title="文件夹">📁</button>
         </div>
         <div v-if="showEmoji" class="emoji-picker">
           <span v-for="emoji in emojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>
@@ -57,6 +65,8 @@
             <input
               ref="fileInputRef"
               type="file"
+              webkitdirectory
+              multiple
               style="display:none"
               @change="handleFile"
             />
@@ -87,6 +97,7 @@ const ws = useWebSocket()
 
 const text = ref('')
 const showEmoji = ref(false)
+const dragOver = ref(false)
 const msgListRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
@@ -152,14 +163,68 @@ function selectFile() {
 
 function handleFile(e: Event) {
   const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file || !session.value) return
-  // For now, just notify - file upload via REST later
-  const match = session.value.id.match(/^group:(\d+)$/)
-  if (match) {
-    ws.sendMessage(parseInt(match[1]), `[文件] ${file.name}`)
-  }
+  const files = input.files
+  if (!files || files.length === 0 || !session.value) return
+  sendFiles(files)
   input.value = '' // reset
+}
+
+function onDragEnter(e: DragEvent) {
+  dragOver.value = true
+}
+
+function onDragOver(e: DragEvent) {
+  dragOver.value = true
+}
+
+function onDragLeave(e: DragEvent) {
+  // Only hide if leaving the message-list itself (not a child)
+  const target = e.currentTarget as HTMLElement
+  const related = e.relatedTarget as HTMLElement
+  if (!related || !target.contains(related)) {
+    dragOver.value = false
+  }
+}
+
+function onDrop(e: DragEvent) {
+  dragOver.value = false
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0 || !session.value) return
+  sendFiles(files)
+}
+
+function sendFiles(files: FileList) {
+  // Build file list: try webkitRelativePath first, else name
+  const names = Array.from(files).map(f => f.webkitRelativePath || f.name)
+  const isFolder = files.length > 0 && files[0].webkitRelativePath
+  const prefix = isFolder ? '[文件夹]' : '[文件]'
+  const msg = `${prefix} ${files.length} 个文件\n${names.join('\n')}`
+
+  const match = session.value!.id.match(/^group:(\d+)$/)
+  if (match) {
+    ws.sendMessage(parseInt(match[1]), msg)
+    // REST fallback
+    fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+      body: JSON.stringify({ group_id: parseInt(match[1]), content: msg })
+    }).catch(() => {})
+    return
+  }
+
+  const fmatch = session.value!.id.match(/^friend:(.+)$/)
+  if (fmatch) {
+    ws.sendMessage(fmatch[1], msg)
+    sendFriendMessage(fmatch[1], msg).then((res: any) => {
+      if (res && res.id) {
+        session.value!.messages.push({
+          id: res.id, group_id: 0,
+          sender_id: auth.userId || 'me', content: msg,
+          msg_type: 'text', created_at: new Date().toISOString()
+        })
+      }
+    }).catch(() => {})
+  }
 }
 
 function formatTime(iso: string) {
@@ -365,6 +430,28 @@ watch(() => chat.activeId, async () => {
   color: #bbb;
   padding: 48px 16px;
   font-size: 14px;
+}
+
+/* Drag & drop indicator */
+.message-list.drag-over {
+  position: relative;
+  outline: 3px dashed #1890ff;
+  outline-offset: -3px;
+  background: rgba(24, 144, 255, 0.04);
+}
+.message-list.drag-over::after {
+  content: '📁 松开鼠标发送文件';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  color: #1890ff;
+  background: rgba(255,255,255,0.9);
+  padding: 12px 24px;
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(24,144,255,0.2);
 }
 
 /* Chat input */

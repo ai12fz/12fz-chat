@@ -137,11 +137,27 @@ def on_message(ws, raw):
         stop_ping.set()
         agent_status("d", 0, "")
 
-        # Read reply (last non-empty section)
-        full_out = b"".join(reply_bytes).decode("utf-8", errors="replace")
-        # Extract response after the last tool section
-        parts = full_out.split("╭─")
+        # Read reply
+        full_out = bytes().join(reply_bytes).decode("utf-8", errors="replace")
+        # Strip ANSI escape codes and CR
+        full_out = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', full_out)
+        full_out = full_out.replace('\r', '')
+        # Extract AI response from box structure: split on ╭ (U+256d)
+        parts = full_out.split('\u256d')
         reply = parts[-1].strip() if len(parts) > 1 else full_out.strip()
+        # Split into lines, remove header/footer/debug
+        lines = reply.split('\n')
+        while lines and (not lines[0].strip() or
+                         '\u256e' in lines[0] or  # ╮ header end
+                         '\u255a' in lines[0]):   # ╚ box corner
+            lines.pop(0)
+        footers = {'Resume', 'hermes --resume', 'Session:', 'Duration:', 'Messages:'}
+        while lines and (not lines[-1].strip() or
+                         '\u2570' in lines[-1] or  # ╰ footer start
+                         any(lines[-1].strip().startswith(f) for f in footers)):
+            lines.pop()
+        # Strip 4-space indent (box padding)
+        reply = '\n'.join(l[4:] if l.startswith('    ') else l for l in lines).strip()
         if not reply:
             err = proc.stderr.read().decode("utf-8", errors="replace")[:500]
             reply = err if err else "（处理完成但未返回文本）"

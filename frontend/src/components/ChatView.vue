@@ -37,7 +37,7 @@
       <div class="chat-input-area">
         <div class="toolbar">
           <button class="tool-btn" @click="showEmoji = !showEmoji" title="表情">😊</button>
-          <button class="tool-btn" @click="selectFile" title="文件">📁</button>
+          <button class="tool-btn" @click="selectFile" title="文件夹">📁</button>
         </div>
         <div v-if="showEmoji" class="emoji-picker">
           <span v-for="emoji in emojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>
@@ -57,6 +57,8 @@
             <input
               ref="fileInputRef"
               type="file"
+              webkitdirectory
+              multiple
               style="display:none"
               @change="handleFile"
             />
@@ -155,12 +157,14 @@ function selectFile() {
 
 function handleFile(e: Event) {
   const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file || !session.value) return
-  // For now, just notify - file upload via REST later
+  const files = input.files
+  if (!files || files.length === 0 || !session.value) return
+  // Build a list of relative paths from the folder
+  const names = Array.from(files).map(f => f.webkitRelativePath || f.name)
   const match = session.value.id.match(/^group:(\d+)$/)
+  const msg = `[文件夹] ${files.length} 个文件\n${names.join('\n')}`
   if (match) {
-    ws.sendMessage(parseInt(match[1]), `[文件] ${file.name}`)
+    ws.sendMessage(parseInt(match[1]), msg)
   }
   input.value = '' // reset
 }
