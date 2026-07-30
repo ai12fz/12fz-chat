@@ -37,7 +37,7 @@
       <div class="chat-input-area">
         <div class="toolbar">
           <button class="tool-btn" @click="showEmoji = !showEmoji" title="表情">😊</button>
-          <button class="tool-btn" @click="selectFile" title="文件">📎</button>
+          <button class="tool-btn" @click="selectFile" title="文件">📁</button>
         </div>
         <div v-if="showEmoji" class="emoji-picker">
           <span v-for="emoji in emojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>

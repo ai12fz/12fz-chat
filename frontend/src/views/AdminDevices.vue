@@ -34,11 +34,16 @@
     </div>
 
     <table v-if="devices.length" class="table">
-      <thead><tr><th>设备名</th><th>状态</th><th>Token</th><th>系统</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
+      <thead><tr><th>设备名</th><th>状态</th><th>模型</th><th>Token</th><th>系统</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="d in devices" :key="d.id">
           <td><span @dblclick="startRename(d)" title="双击改名">{{ d.name }}</span></td>
           <td><span class="status-dot" :class="d.status" :title="d.status"></span> {{ d.status === 'online' ? '在线' : d.status === 'offline' ? '离线' : (d.status || '未知') }}</td>
+          <td>
+            <select :value="d.model_name || 'deepseek-v4-flash'" @change="changeModel(d, ($event.target as HTMLSelectElement).value)" class="model-select">
+              <option v-for="m in models" :key="m.name" :value="m.name">{{ m.display_name || m.name }}</option>
+            </select>
+          </td>
           <td><code>{{ (d.token||'').slice(0, 12) }}...</code></td>
           <td>{{ d.os || '—' }}</td>
           <td>{{ fmt(d.last_seen) }}</td>
@@ -57,6 +62,7 @@ import { ref, onMounted } from 'vue'
 
 const devices = ref<any[]>([])
 const regCodes = ref<any[]>([])
+const models = ref<any[]>([])
 
 async function request(url: string, opts: any = {}) {
   const token = localStorage.getItem('token') || ''
@@ -67,6 +73,13 @@ async function request(url: string, opts: any = {}) {
 }
 
 onMounted(loadData)
+onMounted(async () => {
+  try {
+    const r = await request('/admin/proxy/models')
+    if (Array.isArray(r)) models.value = r
+    else if (r.data && Array.isArray(r.data)) models.value = r.data
+  } catch(_) {}
+})
 
 async function loadData() {
   try {
@@ -118,6 +131,14 @@ async function del(d: any) {
   loadData()
 }
 
+async function changeModel(d: any, modelName: string) {
+  await request('/api/devices/' + encodeURIComponent(d.id) + '/model', {
+    method: 'PUT',
+    body: JSON.stringify({ model_name: modelName, model_provider: '' })
+  })
+  d.model_name = modelName
+}
+
 function fmt(t: string) {
   return t ? new Date(t).toLocaleString('zh-CN') : '—'
 }
@@ -148,6 +169,7 @@ function fmt(t: string) {
 .tag.online { background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .tag.offline { background: #f3f4f6; color: #9ca3af; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .empty { color: #999; padding: 20px; }
+.model-select { padding: 2px 4px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; max-width: 130px; }
 .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 22px; transition: .3s; }

@@ -14,6 +14,13 @@
 
     <!-- Dashboard -->
     <div v-if="tab === 'dashboard'">
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <label style="font-size:13px;color:#666">按Key过滤：</label>
+        <select v-model="selectedKey" @change="loadDashboard" style="padding:4px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px">
+          <option value="">全部Key</option>
+          <option v-for="k in keys" :key="k.id" :value="k.id">{{ k.name || k.key_text?.slice(0,16) }}</option>
+        </select>
+      </div>
       <div class="cards">
         <div class="card" v-for="(v, k) in stats" :key="k">
           <div class="card-label">{{ k }}</div>
@@ -159,6 +166,8 @@ const tabs = [{id:'dashboard',name:'看板'},{id:'models',name:'模型管理'},{
 const tab = ref('dashboard')
 
 const stats = ref<any>({})
+const keys = ref<any[]>([])
+const selectedKey = ref('')
 const dailyData = ref<any[]>([])
 const chartDates = ref<string[]>([])
 const chartMap = ref<Record<string,any[]>>({})
@@ -188,7 +197,6 @@ const models = ref<any[]>([])
 const pricing = ref<any[]>([])
 const multiplier = ref(2)
 const merchants = ref<any[]>([])
-const keys = ref<any[]>([])
 const ledger = ref<any[]>([])
 
 const showModel = ref(false)
@@ -202,7 +210,18 @@ async function call(url: string, opts: any = {}) {
 
 watch(tab, async t => {
   if (t === 'dashboard') {
-  const d = await call('/admin/proxy/dashboard')
+    keys.value = await call('/admin/proxy/keys')
+    await loadDashboard()
+  }
+  if (t === 'models') models.value = await call('/admin/proxy/models')
+  if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
+  if (t === 'merchants') merchants.value = await call('/admin/proxy/merchants')
+  if (t === 'keys') keys.value = await call('/admin/proxy/keys?org_id=' + keyOrgId.value)
+}, { immediate: true })
+
+async function loadDashboard() {
+  const q = selectedKey.value ? '?key_id=' + selectedKey.value : ''
+  const d = await call('/admin/proxy/dashboard' + q)
   stats.value = { '今日': d.today, '本月': d.month }
   dailyData.value = d.daily || []
   // Build chart data grouped by date+model
@@ -243,8 +262,6 @@ watch(tab, async t => {
   if (t === 'models') models.value = await call('/admin/proxy/models')
   if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
   if (t === 'merchants') merchants.value = await call('/admin/proxy/merchants')
-  if (t === 'keys') keys.value = await call('/admin/proxy/keys?org_id=' + keyOrgId.value)
-}, { immediate: true })
 
 function openModel(m?: any) { editModel.value = m ? { ...m } : { name: '', display_name: '', provider: '', endpoint: '', api_key: '', status: 'active', priority: 0, max_rpm: 60 }; showModel.value = true }
 async function saveModel() {

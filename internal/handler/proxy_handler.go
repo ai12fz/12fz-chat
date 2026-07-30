@@ -10,7 +10,8 @@ import (
 // ── Dashboard ──
 
 func (h *HTTPHandler) ProxyDashboard(w http.ResponseWriter, r *http.Request) {
-	today, month, daily, topModels := h.db.ProxyDashboard(r.Context())
+	keyID := r.URL.Query().Get("key_id")
+	today, month, daily, topModels := h.db.ProxyDashboard(r.Context(), keyID)
 	jsonResp(w, map[string]interface{}{
 		"today":      today,
 		"month":      month,

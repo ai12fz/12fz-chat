@@ -130,11 +130,14 @@ func main() {
 	api.HandleFunc("/devices/heartbeat", httpHandler.DeviceHeartbeat).Methods("POST")
 	r.HandleFunc("/api/devices/{id}/toggle-skills", httpHandler.ToggleDeviceSkills).Methods("POST")
 	r.HandleFunc("/api/devices/{id}/toggle-software", httpHandler.ToggleDeviceSoftware).Methods("POST")
-
+	r.HandleFunc("/api/devices/{id}/model", httpHandler.GetDeviceModel).Methods("GET")
+	r.HandleFunc("/api/devices/{id}/model", httpHandler.SetDeviceModel).Methods("PUT")
+	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
 	r.HandleFunc("/api/devices/{id}/activity", httpHandler.GetDeviceActivity).Methods("GET")
 	r.HandleFunc("/api/devices/activity", httpHandler.PostDeviceActivity).Methods("POST")
 
 	r.HandleFunc("/api/skills", httpHandler.ListSkills).Methods("GET")
+	r.HandleFunc("/api/capabilities", httpHandler.ListCapabilities).Methods("GET")
 	r.HandleFunc("/api/skills/{name}", httpHandler.UpdateSkill).Methods("PUT")
 	r.HandleFunc("/api/skills/{name}", httpHandler.DeleteSkill).Methods("DELETE")
 		r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
@@ -171,7 +174,7 @@ func main() {
 
 	// Serve static frontend
 		r.HandleFunc("/api/test-log", func(w http.ResponseWriter, r *http.Request) {
-		_, err := database.LogProxyUsage(r.Context(), "00000000-0000-0000-0000-000000000000", "test-model", 999)
+		_, err := database.LogProxyUsage(r.Context(), "00000000-0000-0000-0000-000000000000", 0, "test-model", 999)
 		if err != nil {
 			w.Write([]byte("err: " + err.Error()))
 		} else {

@@ -11,9 +11,10 @@
     </div>
 
     <table v-if="agents.length">
-      <thead><tr><th>Bot ID</th><th>显示名</th><th>类型</th><th>模型</th><th>状态</th><th>群聊</th><th>操作</th></tr></thead>
+      <thead><tr><th>设备</th><th>Bot ID</th><th>显示名</th><th>类型</th><th>模型</th><th>状态</th><th>群聊</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="a in agents" :key="a.bot_id">
+          <td>{{ a.swarm_name || '—' }}</td>
           <td>{{ a.bot_id }}</td><td>{{ a.display_name }}</td>
           <td><span :class="'type-tag type-' + (a.agent_type || 'api')">{{ a.agent_type === 'hermes' ? 'Hermes' : 'API' }}</span></td>
           <td>

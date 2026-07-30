@@ -10,22 +10,27 @@ import (
 
 // ── Dashboard ──
 
-func (d *DB) ProxyDashboard(ctx context.Context) (today map[string]interface{}, month map[string]interface{}, daily []map[string]interface{}, topModels interface{}) {
+func (d *DB) ProxyDashboard(ctx context.Context, keyID string) (today map[string]interface{}, month map[string]interface{}, daily []map[string]interface{}, topModels interface{}) {
+	keyFilter := ""
+	if keyID != "" {
+		keyFilter = " AND key_id=" + keyID
+ 	}
+
 	var tcalls, ttokens int
 	var tcost float64
 	d.pool.QueryRow(ctx, `SELECT COALESCE(COUNT(*),0), COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost)::numeric,0)
-		FROM chat.proxy_usage WHERE created_at::date = CURRENT_DATE`).Scan(&tcalls, &ttokens, &tcost)
+		FROM chat.proxy_usage WHERE created_at::date = CURRENT_DATE`+keyFilter).Scan(&tcalls, &ttokens, &tcost)
 	today = map[string]interface{}{"calls": tcalls, "tokens": ttokens, "cost": tcost}
 
 	var mcalls, mtokens int
 	var mcost float64
 	d.pool.QueryRow(ctx, `SELECT COALESCE(COUNT(*),0), COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost)::numeric,0)
-		FROM chat.proxy_usage WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`).Scan(&mcalls, &mtokens, &mcost)
+		FROM chat.proxy_usage WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`+keyFilter).Scan(&mcalls, &mtokens, &mcost)
 	month = map[string]interface{}{"calls": mcalls, "tokens": mtokens, "cost": mcost}
 
 	daily = []map[string]interface{}{}
 	rows, _ := d.pool.Query(ctx, `SELECT created_at::date::text, COUNT(*), SUM(total_tokens), SUM(cost)::numeric, model_name
-		FROM chat.proxy_usage WHERE created_at >= CURRENT_DATE - 30
+		FROM chat.proxy_usage WHERE created_at >= CURRENT_DATE - 30`+keyFilter+`
 		GROUP BY created_at::date, model_name ORDER BY created_at::date, model_name`)
 	if rows != nil {
 		defer rows.Close()
@@ -242,7 +247,7 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-func (d *DB) LogProxyUsage(ctx context.Context, orgID, modelName string, tokens int) (float64, error) {
+func (d *DB) LogProxyUsage(ctx context.Context, orgID string, keyID int, modelName string, tokens int) (float64, error) {
 	// Calculate cost from pricing
 	var cost float64
 	var priceAmount float64
@@ -261,7 +266,11 @@ func (d *DB) LogProxyUsage(ctx context.Context, orgID, modelName string, tokens 
 		// priceAmount is per 1000 tokens
 		cost = float64(tokens) / 1000.0 * priceAmount * multiplier
 	}
-	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, created_at) VALUES ($1, $2, $3, $4, NOW())", orgID, modelName, tokens, cost)
+	var keyIDPtr interface{}
+	if keyID > 0 {
+		keyIDPtr = keyID
+	}
+	_, err := d.pool.Exec(ctx, "INSERT INTO chat.proxy_usage (org_id, model_name, total_tokens, cost, key_id, created_at) VALUES ($1, $2, $3, $4, $5, NOW())", orgID, modelName, tokens, cost, keyIDPtr)
 	return cost, err
 }
 

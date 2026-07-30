@@ -1,143 +1,234 @@
 #!/usr/bin/env python3
-"""12FZ Hermes Bridge — WebSocket ↔ Hermes 消息桥接"""
-import json, time, struct, threading, subprocess, os, sys
+"""12FZ Hermes Bridge v7 — streaming STDOUT parser + capability IDs"""
+import json, threading, subprocess, os, sys, time, requests, websocket, re
 
 CONFIG_PATH = os.path.expanduser("~/.hermes/12fz-bridge.json")
-
-def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        print(f"需要配置文件 {CONFIG_PATH}")
-        sys.exit(1)
-    with open(CONFIG_PATH) as f:
-        return json.load(f)
-
-cfg = load_config()
+cfg = json.load(open(CONFIG_PATH))
 TOKEN = cfg["token"]
 BOT_ID = cfg["bot_id"]
 WS_HOST = cfg.get("ws_host", "ai.12fz.com")
+USER_ID = cfg.get("user_id", "1")
 
-import socket, ssl
+API_BASE = "https://%s" % WS_HOST
+HEADERS = {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"}
 
-def connect():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(30)
-    ctx = ssl.create_default_context()
-    ssock = ctx.wrap_socket(sock, server_hostname=WS_HOST)
-    ssock.connect((WS_HOST, 443))
-    req = f"GET /ws?token={TOKEN} HTTP/1.1\r\nHost: {WS_HOST}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\nSec-WebSocket-Version: 13\r\n\r\n"
-    ssock.send(req.encode())
-    resp = ssock.recv(4096)
-    if b"101" not in resp:
-        raise Exception(f"WS handshake failed: {resp[:200]}")
-    return ssock
+# ── capability map: name→{id,icon,desc} ──
+CAP_MAP = {}
 
-def ws_send(ws, text):
-    data = text.encode()
-    l = len(data)
-    if l < 126:
-        header = bytes([0x81, 0x80 | l])
-    elif l < 65536:
-        header = bytes([0x81, 0x80 | 126]) + struct.pack(">H", l)
-    else:
-        header = bytes([0x81, 0x80 | 127]) + struct.pack(">Q", l)
-    mask = os.urandom(4)
-    masked = bytearray(data)
-    for i in range(l):
-        masked[i] ^= mask[i % 4]
-    ws.send(header + mask + bytes(masked))
-
-def ws_recv(ws):
-    h = ws.recv(2)
-    if len(h) < 2:
-        raise EOFError()
-    op = h[0] & 0x0F
-    if op == 8:
-        return None
-    if op == 9:
-        ws.send(bytes([0x8A, h[1] & 0x7F]) + ws.recv(h[1] & 0x7F))
-        return ws_recv(ws)
-    plen = h[1] & 0x7F
-    if plen == 126:
-        plen = struct.unpack(">H", ws.recv(2))[0]
-    elif plen == 127:
-        plen = struct.unpack(">Q", ws.recv(8))[0]
-    mask_bytes = ws.recv(4)
-    data = bytearray()
-    while len(data) < plen:
-        chunk = ws.recv(min(plen - len(data), 4096))
-        if not chunk:
-            raise EOFError()
-        data.extend(chunk)
-    for i in range(len(data)):
-        data[i] ^= mask_bytes[i % 4]
-    return data.decode(errors="replace")
-
-def hb_loop(ws_ref):
-    while True:
-        time.sleep(30)
-        try:
-            if ws_ref[0]:
-                ws_send(ws_ref[0], json.dumps({"type":"ping"}))
-        except:
-            pass
-
-def process_message(ws, text):
+def load_capabilities():
+    global CAP_MAP
     try:
-        result = subprocess.run(
-            ["hermes", "chat", "-q", text, "--quiet"],
-            capture_output=True, text=True, timeout=300,
-            env={**os.environ, "HERMES_YOLO_MODE": "1"}
-        )
-        reply = result.stdout.strip() or result.stderr.strip()[:500] or "(空)"
-    except subprocess.TimeoutExpired:
-        reply = "⏰ 超时"
-    except FileNotFoundError:
-        reply = "❌ 未安装 hermes"
+        r = requests.get(API_BASE + "/api/capabilities", headers=HEADERS, timeout=10)
+        if r.status_code == 200:
+            for c in r.json():
+                CAP_MAP[c["name"]] = {"id": c["id"], "icon": c["icon"], "desc": c["description"]}
+            print("[bridge] loaded %d capabilities" % len(CAP_MAP), flush=True)
+        else:
+            print("[bridge] capabilities http %d" % r.status_code, flush=True)
     except Exception as e:
-        reply = f"❌ {e}"
+        print("[bridge] capabilities err: %s" % e, flush=True)
 
-    rmsg = json.dumps({"type":"message","data":{"from":BOT_ID,"to":cfg.get("user_id","1"),"content":reply}})
+# ── tool detection patterns ──
+TOOL_PATTERNS = [
+    (r"preparing terminal",   "terminal"),
+    (r"\$ .+",                "terminal"),     # shell command
+    (r"reading file",         "read_file"),
+    (r"writing file",         "write_file"),
+    (r"patching file",        "write_file"),
+    (r"searching",            "web_search"),
+    (r"fetching",             "web_search"),
+    (r"browsing",             "browser"),
+    (r"running code",         "code_exec"),
+    (r"memorizing",           "memory"),
+    (r"preparing (desktop|computer)", "computer_use"),
+]
+
+def detect_tool(line):
+    """Detect tool name from hermes stdout line"""
+    line = line.strip()
+    for pattern, tool in TOOL_PATTERNS:
+        if re.search(pattern, line, re.IGNORECASE):
+            # extract command detail for terminal
+            if tool == "terminal":
+                m = re.search(r"\$ (.+)  [0-9.]+s", line)
+                if m:
+                    return tool, m.group(1)[:60]
+            return tool, ""
+    return None, None
+
+def load_env():
+    if "HERMES_CUSTOM_TK_12FZ_COM_API_KEY" in os.environ:
+        return
+    for p in [
+        os.path.expanduser("~/AppData/Local/hermes/.env"),
+        "C:\\Users\\Administrator\\AppData\\Local\\hermes\\.env",
+    ]:
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1)
+                        os.environ[k.strip()] = v.strip().strip("'\"")
+            break
+
+def send_ws(ws, msg):
     try:
-        ws_send(ws, rmsg)
+        ws.send(json.dumps(msg))
     except:
         pass
 
-ws = [None]
+def on_message(ws, raw):
+    try:
+        msg = json.loads(raw)
+    except json.JSONDecodeError:
+        return
+    if msg.get("type") != "message":
+        return
+    content = msg.get("data", {}).get("content", "")
+    if not content:
+        return
+    print("[bridge] msg: %s" % content[:80], flush=True)
+
+    # ── streaming hermes subprocess ──
+    def agent_status(p, t, d):
+        send_ws(ws, {"type":"agent_status","data":{"p":p,"t":t,"d":d}})
+        print("[bridge] status %s c=%s %s" % (p, t, d[:30] if d else ""), flush=True)
+
+    agent_status("s", 0, "处理中...")
+
+    # WS keepalive thread
+    stop_ping = threading.Event()
+    def ping_loop():
+        while not stop_ping.wait(20):
+            send_ws(ws, {"type":"ping"})
+    tp = threading.Thread(target=ping_loop, daemon=True)
+    tp.start()
+
+    reply = ""
+    try:
+        load_env()
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
+        env["LC_ALL"] = "C.UTF-8"
+
+        proc = subprocess.Popen(
+            [sys.executable, os.path.join(os.path.dirname(sys.executable), "..", "..", "hermes"),
+             "chat", "-q", content],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env)
+        reply_bytes = []
+
+        # Stream stdout line by line
+        last_tool = None
+        for line_bytes in iter(proc.stdout.readline, b""):
+            line = line_bytes.decode("utf-8", errors="replace")
+            # Detect tool usage from "┊" lines
+            if "┊" in line:
+                tool, detail = detect_tool(line)
+                if tool and tool in CAP_MAP:
+                    cap = CAP_MAP[tool]
+                    agent_status("s", cap["id"], detail or cap["desc"])
+                    last_tool = tool
+            reply_bytes.append(line_bytes)
+
+        proc.wait(timeout=600)
+        stop_ping.set()
+        agent_status("d", 0, "")
+
+        # Read reply (last non-empty section)
+        full_out = b"".join(reply_bytes).decode("utf-8", errors="replace")
+        # Extract response after the last tool section
+        parts = full_out.split("╭─")
+        reply = parts[-1].strip() if len(parts) > 1 else full_out.strip()
+        if not reply:
+            err = proc.stderr.read().decode("utf-8", errors="replace")[:500]
+            reply = err if err else "（处理完成但未返回文本）"
+
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stop_ping.set()
+        reply = "处理超时，请重试"
+        agent_status("d", 0, "")
+    except FileNotFoundError:
+        stop_ping.set()
+        reply = "hermes not installed"
+    except Exception as e:
+        stop_ping.set()
+        reply = "err: %s" % e
+
+    try:
+        resp = requests.post(
+            API_BASE + "/api/friend-messages",
+            headers=HEADERS,
+            json={"friend_id": USER_ID, "content": reply},
+            timeout=15)
+        print("[bridge] reply http %d" % resp.status_code, flush=True)
+    except Exception as e:
+        print("[bridge] http err: %s" % e, flush=True)
+
+def on_error(ws, err):
+    print("[bridge] ws error: %s" % err, flush=True)
+def on_close(ws, *a):
+    print("[bridge] ws closed", flush=True)
+def on_open(ws):
+    print("[bridge] connected as %s" % BOT_ID, flush=True)
+    # Load capabilities on connect
+    threading.Thread(target=load_capabilities, daemon=True).start()
+
+def hb_loop():
+    while True:
+        time.sleep(55)
+        try:
+            requests.post(API_BASE + "/api/devices/heartbeat", headers=HEADERS, timeout=10)
+            # ── sync model config from server ──
+            sync_model_config()
+        except Exception:
+            pass
+
+def sync_model_config():
+    """Fetch device model config and update hermes config.yaml if changed"""
+    import yaml
+    try:
+        r = requests.get(API_BASE + "/api/devices/" + BOT_ID + "/model", headers=HEADERS, timeout=10)
+        if r.status_code != 200:
+            return
+        cfg = r.json()
+        model_name = cfg.get("model_name", "deepseek-v4-flash")
+        model_provider = cfg.get("model_provider", "custom:deepseek-v4-flash(12fz)")
+
+        config_path = os.path.expanduser("~/AppData/Local/hermes/config.yaml")
+        if not os.path.exists(config_path):
+            return
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            hermes_cfg = yaml.safe_load(f)
+
+        current_model = hermes_cfg.get("model", {}).get("default", "")
+        current_provider = hermes_cfg.get("model", {}).get("provider", "")
+
+        if current_model != model_name or current_provider != model_provider:
+            if "model" not in hermes_cfg:
+                hermes_cfg["model"] = {}
+            hermes_cfg["model"]["default"] = model_name
+            hermes_cfg["model"]["provider"] = model_provider
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(hermes_cfg, f, default_flow_style=False, allow_unicode=True)
+            print("[bridge] model changed: %s (%s)" % (model_name, model_provider), flush=True)
+    except Exception as e:
+        print("[bridge] model sync err: %s" % e, flush=True)
 
 def main():
-    for i in range(10):
-        try:
-            ws[0] = connect()
-            print(f"[bridge] connected as {BOT_ID}")
-            break
-        except Exception as e:
-            print(f"[bridge] connect {i+1}/10: {e}")
-            time.sleep(3)
-    else:
-        print("[bridge] all connect attempts failed")
-        sys.exit(1)
-
-    threading.Thread(target=hb_loop, args=(ws,), daemon=True).start()
+    threading.Thread(target=hb_loop, daemon=True).start()
+    url = "wss://%s/ws?token=%s" % (WS_HOST, TOKEN)
     while True:
-        try:
-            raw = ws_recv(ws[0])
-            if raw is None:
-                raise EOFError("close")
-            msg = json.loads(raw)
-            if msg.get("type") == "message":
-                content = msg.get("data", {}).get("content", "")
-                if content:
-                    print(f"[bridge] msg: {content[:80]}")
-                    process_message(ws[0], content)
-        except (EOFError, ConnectionError, OSError) as e:
-            print(f"[bridge] disconnect: {e}, retrying...")
-            time.sleep(3)
-            try:
-                ws[0] = connect()
-                print("[bridge] reconnected")
-            except Exception as e2:
-                print(f"[bridge] reconnect failed: {e2}")
-                time.sleep(5)
+        ws = websocket.WebSocketApp(
+            url, on_message=on_message, on_error=on_error,
+            on_close=on_close, on_open=on_open)
+        ws.run_forever(ping_interval=30, ping_timeout=10)
+        print("[bridge] reconnecting...", flush=True)
+        time.sleep(3)
 
 if __name__ == "__main__":
     main()

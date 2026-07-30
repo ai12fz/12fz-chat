@@ -30,7 +30,7 @@ type Agent struct {
 }
 
 func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, error) {
-	query := "SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), created_at, updated_at FROM chat.agents"
+	query := "SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), COALESCE(swarm_name,''), created_at, updated_at FROM chat.agents"
 	var args []interface{}
 	if len(merchantID) > 0 && merchantID[0] != "" {
 		query += " WHERE merchant_id = $1"
@@ -45,7 +45,7 @@ func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, err
 	var agents []Agent
 	for rows.Next() {
 		var a Agent
-		if err := rows.Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.AgentType, &a.Token, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.AgentType, &a.Token, &a.SwarmName, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		agents = append(agents, a)
@@ -56,9 +56,9 @@ func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, err
 func (d *DB) GetAgent(ctx context.Context, botID string) (*Agent, error) {
 	var a Agent
 	err := d.pool.QueryRow(ctx,
-		"SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), created_at, updated_at FROM chat.agents WHERE bot_id = $1",
+		"SELECT id, bot_id, display_name, model, system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), COALESCE(swarm_name,''), created_at, updated_at FROM chat.agents WHERE bot_id = $1",
 		botID,
-	).Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.AgentType, &a.Token, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.BotID, &a.DisplayName, &a.Model, &a.SystemPrompt, &a.Category, &a.Capabilities, &a.Status, &a.APIKey, &a.APIURL, &a.MerchantID, &a.AgentType, &a.Token, &a.SwarmName, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

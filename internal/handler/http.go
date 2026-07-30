@@ -396,6 +396,22 @@ func (h *HTTPHandler) ListSkills(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, skills, 200)
 }
 
+// ListCapabilities returns tools+skills for current org
+func (h *HTTPHandler) ListCapabilities(w http.ResponseWriter, r *http.Request) {
+	var orgID string
+	if oid := r.URL.Query().Get("org_id"); oid != "" {
+		orgID = oid
+	} else {
+		orgID = "00000000-0000-0000-0000-000000000000"
+	}
+	caps, err := h.db.ListCapabilities(r.Context(), orgID)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, caps, 200)
+}
+
 // CreateSkill adds a new skill
 func (h *HTTPHandler) CreateSkill(w http.ResponseWriter, r *http.Request) {
 	var s map[string]interface{}
@@ -732,6 +748,36 @@ func (h *HTTPHandler) DeviceSetup(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]interface{}{"key": key, "balance": 100000}, 200)
 }
 
+// GetDeviceModel returns the model config for a device
+func (h *HTTPHandler) GetDeviceModel(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	model, provider, err := h.db.GetDeviceModelConfig(r.Context(), id)
+	if err != nil {
+		jsonError(w, "device not found", 404)
+		return
+	}
+	jsonResp(w, map[string]string{"model_name": model, "model_provider": provider}, 200)
+}
+
+// SetDeviceModel updates the model config for a device
+func (h *HTTPHandler) SetDeviceModel(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		Model    string `json:"model_name"`
+		Provider string `json:"model_provider"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	if req.Model == "" {
+		jsonError(w, "model_name required", 400)
+		return
+	}
+	if err := h.db.SetDeviceModelConfig(r.Context(), id, req.Model, req.Provider); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
 
 // ProxyChat forwards /v1/chat/completions to new-api
 func (h *HTTPHandler) ProxyChat(w http.ResponseWriter, r *http.Request) {
@@ -766,11 +812,13 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 			break
 		}
 	}
-	// === BILLING: extract org_id from client API key ===
+	// === BILLING: extract org_id + key_id from client API key ===
 	orgID := "00000000-0000-0000-0000-000000000000" // fallback
+	var keyID int
 	clientKey := ExtractTokenFromHeader(r)
-	if strings.HasPrefix(clientKey, "sk-") {
-		if oid, err := h.db.ValidateAPIKey(r.Context(), clientKey); err == nil {
+	if clientKey != "" {
+		if kid, oid, err := h.db.LookupProxyKey(r.Context(), clientKey); err == nil {
+			keyID = kid
 			orgID = oid
 		}
 	}
@@ -827,7 +875,7 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	// Sync log with retry (critical for billing)
 	var billingCost float64
 	for attempt := 0; attempt < 2; attempt++ {
-		c, e := h.db.LogProxyUsage(r.Context(), orgID, modelName, tokenCount)
+		c, e := h.db.LogProxyUsage(r.Context(), orgID, keyID, modelName, tokenCount)
 		if e == nil { billingCost = c; break }
 		if attempt == 1 {
 			log.Printf("[proxy] USAGE DROP: model=%s tokens=%d err=%v", modelName, tokenCount, e)

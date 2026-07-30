@@ -14,6 +14,7 @@ import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { useWebSocket } from '../composables/useWebSocket'
 import { getMyGroups, getMessages } from '../api'
+import axiosApi from '../api'
 import SidebarLeft from '../components/SidebarLeft.vue'
 import ChatContent from '../components/ChatContent.vue'
 // import AgentStatusPanel from '../components/SidebarRight.vue'
@@ -41,6 +42,22 @@ onMounted(async () => {
     if (groups && Array.isArray(groups)) groups.forEach((g: any) => {
       chat.ensureGroupSession(g)
     })
+
+    // Load friend sessions from stored friend messages
+    try {
+      const resp = await axiosApi.get('/friend-messages', { params: { with: 'hermes-win-qiuming', limit: 1 } })
+      const msgs = resp.data
+      if (msgs && msgs.length > 0) {
+        const last = msgs[msgs.length - 1]
+        const friendId = typeof last.to_id === 'string' && last.to_id !== '1' ? last.to_id : last.from_id
+        const sid = 'friend:' + friendId
+        let s = chat.sessions.find((x: any) => x.id === sid)
+        if (!s) {
+          s = { id: sid, name: friendId, type: 'friend', messages: msgs.reverse(), members: [], lastMsg: last.content, lastMsgAt: last.created_at, unread: 0 }
+          chat.sessions.push(s)
+        }
+      }
+    } catch(e) { console.error('[init] load friend session:', e) }
 
     // Load messages for all groups immediately
     for (const g of groups) {
