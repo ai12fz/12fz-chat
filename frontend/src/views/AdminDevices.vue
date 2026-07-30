@@ -18,7 +18,7 @@
       <table v-if="regCodes.length" class="table">
         <thead><tr><th>注册码</th><th>状态</th><th>设备</th><th>创建</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
         <tbody>
-          <tr v-for="rc in regCodes" :key="rc.code">
+          <tr v-for="rc in visibleCodes" :key="rc.code">
             <td><code>{{ rc.code }}</code></td>
             <td>{{ rc.status === 'active' ? '有效' : rc.status === 'used' ? '已用' : '已撤销' }}</td>
             <td>{{ rc.device_id || '—' }}</td>
@@ -31,6 +31,11 @@
         </tbody>
       </table>
       <div v-else class="empty">暂无注册码</div>
+      <div v-if="regCodes.length > defaultShowCount" class="expand-bar">
+        <button class="btn-link" @click="showAllCodes = !showAllCodes">
+          {{ showAllCodes ? '收起' : `展开全部（共 ${regCodes.length} 条）` }}
+        </button>
+      </div>
     </div>
 
     <table v-if="devices.length" class="table">
@@ -58,11 +63,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const devices = ref<any[]>([])
 const regCodes = ref<any[]>([])
 const models = ref<any[]>([])
+const showAllCodes = ref(false)
+const defaultShowCount = 2
+
+const visibleCodes = computed(() => {
+  if (showAllCodes.value) return regCodes.value
+  return regCodes.value.slice(0, defaultShowCount)
+})
 
 async function request(url: string, opts: any = {}) {
   const token = localStorage.getItem('token') || ''
@@ -169,6 +181,9 @@ function fmt(t: string) {
 .tag.online { background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .tag.offline { background: #f3f4f6; color: #9ca3af; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .empty { color: #999; padding: 20px; }
+.expand-bar { text-align: center; padding: 8px 0; }
+.btn-link { background: none; border: none; color: #6366f1; cursor: pointer; font-size: 13px; padding: 4px 8px; }
+.btn-link:hover { text-decoration: underline; }
 .model-select { padding: 2px 4px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; max-width: 130px; }
 .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
 .switch input { opacity: 0; width: 0; height: 0; }
