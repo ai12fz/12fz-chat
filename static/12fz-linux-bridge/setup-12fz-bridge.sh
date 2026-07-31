@@ -1,14 +1,15 @@
 #!/bin/bash
 # 12FZ Linux Hermes Bridge — 一键部署脚本
-# 用法: bash setup-12fz-bridge.sh [设备名] [agent_type]
+# 用法: bash setup-12fz-bridge.sh [设备名] [agent_type] [注册码]
 # 设备名默认 hermes-linux-qiuming,可改成你想要的(唯一即可)
 # agent_type 可选: hermes / 12fzclaw / openclaw,默认 hermes
+# 注册码: 从后台"设备管理"生成,必填(或设环境变量 REG_CODE)
 set -e
 
 BOT_ID="${1:-hermes-linux-qiuming}"
 AGENT_TYPE="${2:-${AGENT_TYPE:-hermes}}"   # 安装类型: hermes / 12fzclaw / openclaw
-REG_CODE="dev-LQztUhv3ASEz"          # 预生成的注册码(已登记在服务器,一次性)
-WS_HOST="ai.12fz.com"
+REG_CODE="${3:-${REG_CODE:-}}"             # 注册码(必填)
+WS_HOST="${WS_HOST:-ai.12fz.com}"
 USER_ID="1"
 BRIDGE_DIR="$HOME/12fz-bridge"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
@@ -81,10 +82,11 @@ else
   echo "!! 未找到 $CFG_FILE — 请先 hermes setup 初始化"
 fi
 
-# 4) 拷贝 bridge 脚本
+# 4) 拷贝 bridge 脚本(优先本地,其次从服务器下载)
 echo "==> 拷贝 bridge.py -> $BRIDGE_DIR/hermes-bridge.py"
 cp "$(dirname "$0")/hermes-bridge.py" "$BRIDGE_DIR/hermes-bridge.py" 2>/dev/null \
-  || curl -fsSL -o "$BRIDGE_DIR/hermes-bridge.py" "https://raw.githubusercontent.com/qiu/ai-chat/master/static/hermes-bridge-v8.py"
+  || cp "$(dirname "$0")/hermes-bridge-v8.py" "$BRIDGE_DIR/hermes-bridge.py" 2>/dev/null \
+  || curl -fsSL -o "$BRIDGE_DIR/hermes-bridge.py" "https://$WS_HOST/static/hermes-bridge-v8.py"
 
 # 5) 安装依赖
 echo "==> 安装 Python 依赖..."

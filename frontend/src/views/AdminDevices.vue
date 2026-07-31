@@ -24,7 +24,8 @@
             <td>{{ rc.device_id || '—' }}</td>
             <td>{{ fmt(rc.created_at) }}</td>
             <td>
-              <button class="btn-sm" @click="copyText('curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=' + rc.code)">复制安装命令</button>
+              <button class="btn-sm" :disabled="rc.status!=='active'" @click="copyText('curl -s https://ai.12fz.com/static/install-device.sh | bash -s -- --code=' + rc.code)">🐧 Linux 命令</button>
+              <button class="btn-sm" :disabled="rc.status!=='active'" @click="copyText('powershell -ExecutionPolicy Bypass -Command \"iwr https://ai.12fz.com/static/install-device.ps1 -OutFile $env:TEMP\\install-device.ps1; & $env:TEMP\\install-device.ps1 -Code ' + rc.code + '\"')">🪟 Windows 命令</button>
               <button v-if="rc.status==='active'" class="btn-danger btn-sm" @click="revokeCode(rc.code)">撤销</button>
             </td>
           </tr>
