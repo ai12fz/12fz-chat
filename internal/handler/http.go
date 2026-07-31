@@ -479,14 +479,31 @@ func (h *HTTPHandler) DeviceHeartbeat(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "unauthorized", 401)
 		return
 	}
-	// Only devices should heartbeat (numeric IDs)
-	if _, err := strconv.Atoi(deviceID); err != nil {
+	// Numeric IDs are regular users, not devices — skip
+	if _, err := strconv.Atoi(deviceID); err == nil {
 		jsonResp(w, map[string]string{"status": "ok"}, 200)
 		return
 	}
+	// Accept optional ip from body ({"ip":"x.x.x.x"}) or query (?ip=)
+	ip := r.URL.Query().Get("ip")
+	if ip == "" {
+		var req struct {
+			IP string `json:"ip"`
+		}
+		if r.Body != nil {
+			json.NewDecoder(r.Body).Decode(&req)
+		}
+		ip = req.IP
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
-	if err := h.db.UpdateDeviceLastSeen(ctx, deviceID); err != nil {
+	var err error
+	if ip != "" {
+		err = h.db.UpdateDeviceHeartbeat(ctx, deviceID, ip)
+	} else {
+		err = h.db.UpdateDeviceLastSeen(ctx, deviceID)
+	}
+	if err != nil {
 		log.Printf("[heartbeat] update failed for %s: %v", deviceID, err)
 	}
 	jsonResp(w, map[string]string{"status": "ok"}, 200)

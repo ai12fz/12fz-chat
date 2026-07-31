@@ -195,6 +195,12 @@ func (db *DB) UpdateDeviceLastSeen(ctx context.Context, deviceID string) error {
 	return err
 }
 
+// UpdateDeviceHeartbeat updates last_seen and local_ip in one shot
+func (db *DB) UpdateDeviceHeartbeat(ctx context.Context, deviceID, ip string) error {
+	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW(), local_ip=$2 WHERE id=$1", deviceID, ip)
+	return err
+}
+
 // ResetDeviceStatus resets all device statuses to offline (called at server startup)
 func (db *DB) ResetDeviceStatus(ctx context.Context) error {
 	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET status='offline'")

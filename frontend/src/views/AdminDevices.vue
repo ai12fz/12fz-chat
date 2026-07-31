@@ -62,7 +62,10 @@
               <option v-for="m in models" :key="m.name" :value="m.name">{{ m.display_name || m.name }}</option>
             </select>
           </td>
-          <td><code>{{ (d.token||'').slice(0, 12) }}...</code></td>
+          <td>
+            <code>{{ (d.token||'').slice(0, 12) }}...</code>
+            <button class="btn-sm copy-btn" title="复制完整 token" @click="copyText(d.token||'')">📋 复制</button>
+          </td>
           <td>{{ d.os || '—' }}</td>
           <td>{{ d.local_ip || '—' }}</td>
           <td>{{ fmt(d.last_seen) }}</td>
@@ -156,6 +159,13 @@ async function revokeCode(code: string) {
 }
 
 function copyText(t: string) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(() => alert('已复制')).catch(() => fallbackCopy(t))
+  } else {
+    fallbackCopy(t)
+  }
+}
+function fallbackCopy(t: string) {
   var ta = document.createElement('textarea')
   ta.value = t
   ta.style.position = 'fixed'
@@ -221,6 +231,7 @@ function fmt(t: string) {
 .btn-link { background: none; border: none; color: #6366f1; cursor: pointer; font-size: 13px; padding: 4px 8px; }
 .btn-link:hover { text-decoration: underline; }
 .model-select { padding: 2px 4px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; max-width: 130px; }
+.copy-btn { margin-left: 6px; white-space: nowrap; }
 .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 22px; transition: .3s; }
