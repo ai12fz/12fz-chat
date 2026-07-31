@@ -52,7 +52,7 @@
     </div>
 
     <table v-if="devices.length" class="table">
-      <thead><tr><th>设备名</th><th>状态</th><th>模型</th><th>Token</th><th>系统</th><th>本地IP</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
+      <thead><tr><th>设备名</th><th>状态</th><th>模型</th><th>Token</th><th>系统</th><th>安装</th><th>本地IP</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="d in devices" :key="d.id">
           <td><span @dblclick="startRename(d)" title="双击改名">{{ d.name }}</span></td>
@@ -67,6 +67,7 @@
             <button class="btn-sm copy-btn" title="复制完整 token" @click="copyText(d.token||'')">📋 复制</button>
           </td>
           <td>{{ d.os || '—' }}</td>
+          <td><span class="agent-badge" :class="'agent-' + (d.agent_type || 'hermes')">{{ agentLabel(d.agent_type) }}</span></td>
           <td>{{ d.local_ip || '—' }}</td>
           <td>{{ fmt(d.last_seen) }}</td>
           <td><label class="switch"><input type="checkbox" :checked="d.allow_install_skills" @change="toggleSkills(d)"><span class="slider"></span></label></td>
@@ -200,6 +201,11 @@ async function changeModel(d: any, modelName: string) {
 function fmt(t: string) {
   return t ? new Date(t).toLocaleString('zh-CN') : '—'
 }
+
+function agentLabel(t?: string) {
+  const m: Record<string, string> = { '12fzclaw': '12fzclaw', openclaw: 'openclaw', hermes: 'Hermes' }
+  return m[t || ''] || (t || '—')
+}
 </script>
 
 <style scoped>
@@ -226,6 +232,11 @@ function fmt(t: string) {
 .table th { background: #f9fafb; font-size: 13px; color: #666; }
 .tag.online { background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
 .tag.offline { background: #f3f4f6; color: #9ca3af; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.agent-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.agent-hermes { background: #e0e7ff; color: #4338ca; }
+.agent-12fzclaw { background: #d1fae5; color: #047857; }
+.agent-openclaw { background: #ffedd5; color: #c2410c; }
+.agent- { background: #f3f4f6; color: #6b7280; }
 .empty { color: #999; padding: 20px; }
 .expand-bar { text-align: center; padding: 8px 0; }
 .btn-link { background: none; border: none; color: #6366f1; cursor: pointer; font-size: 13px; padding: 4px 8px; }

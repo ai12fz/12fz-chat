@@ -326,9 +326,13 @@ def hb_loop():
         time.sleep(55)
         try:
             ip = get_local_ip()
+            body = {"ip": ip} if ip else {}
+            agent = cfg.get("agent_type", "hermes")
+            if agent:
+                body["agent_type"] = agent
             requests.post(API_BASE + "/api/devices/heartbeat",
                           headers=HEADERS,
-                          json={"ip": ip} if ip else None,
+                          json=body,
                           timeout=10)
             # ── sync model config from server ──
             sync_model_config()

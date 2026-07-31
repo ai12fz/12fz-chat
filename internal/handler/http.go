@@ -486,20 +486,21 @@ func (h *HTTPHandler) DeviceHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	// Accept optional ip from body ({"ip":"x.x.x.x"}) or query (?ip=)
 	ip := r.URL.Query().Get("ip")
+	var req struct {
+		IP        string `json:"ip"`
+		AgentType string `json:"agent_type"`
+	}
+	if r.Body != nil {
+		json.NewDecoder(r.Body).Decode(&req)
+	}
 	if ip == "" {
-		var req struct {
-			IP string `json:"ip"`
-		}
-		if r.Body != nil {
-			json.NewDecoder(r.Body).Decode(&req)
-		}
 		ip = req.IP
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 	var err error
 	if ip != "" {
-		err = h.db.UpdateDeviceHeartbeat(ctx, deviceID, ip)
+		err = h.db.UpdateDeviceHeartbeat(ctx, deviceID, ip, req.AgentType)
 	} else {
 		err = h.db.UpdateDeviceLastSeen(ctx, deviceID)
 	}
@@ -706,12 +707,13 @@ func (h *HTTPHandler) RegisterDevice(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 		DeviceKey string `json:"device_key"`
 		OS        string `json:"os"`
+		AgentType string `json:"agent_type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.DeviceKey == "" {
 		jsonError(w, "name and device_key required", 400)
 		return
 	}
-	dev, err := h.db.RegisterDevice(r.Context(), req.Name, req.DeviceKey, req.OS)
+	dev, err := h.db.RegisterDevice(r.Context(), req.Name, req.DeviceKey, req.OS, req.AgentType)
 	if err != nil {
 		jsonError(w, "invalid or used registration code: "+err.Error(), 400)
 		return

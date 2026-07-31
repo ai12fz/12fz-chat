@@ -16,6 +16,7 @@ type Device struct {
 	OrgID     string    `json:"org_id"`
 	Token     string    `json:"token"`
 	OS        string    `json:"os"`
+	AgentType string    `json:"agent_type"`
 	Status    string    `json:"status"`
 	LocalIP   string    `json:"local_ip"`
 	LastSeen  time.Time `json:"last_seen"`
@@ -24,7 +25,7 @@ type Device struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
-func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*Device, error) {
+func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os, agentType string) (*Device, error) {
 	var orgID string
 	err := d.pool.QueryRow(ctx,
 		"UPDATE chat.device_reg_codes SET status='used', used_at=now() WHERE code=$1 AND status='active' RETURNING org_id::text",
@@ -33,10 +34,10 @@ func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*D
 		return nil, fmt.Errorf("invalid or used registration code")
 	}
 	token := generateToken()
-	dev := &Device{Name: name, OrgID: orgID, Token: token, OS: os, Status: "online"}
+	dev := &Device{Name: name, OrgID: orgID, Token: token, OS: os, AgentType: agentType, Status: "online"}
 	err = d.pool.QueryRow(ctx,
-		"INSERT INTO chat.devices (id, name, org_id, token, os) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, token=$4, os=$5, last_seen=NOW(), status='online' RETURNING id, created_at",
-		name, name, orgID, token, os).Scan(&dev.ID, &dev.CreatedAt)
+		"INSERT INTO chat.devices (id, name, org_id, token, os, agent_type) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET name=$2, token=$4, os=$5, agent_type=COALESCE(NULLIF($6,''), chat.devices.agent_type), last_seen=NOW(), status='online' RETURNING id, created_at",
+		name, name, orgID, token, os, agentType).Scan(&dev.ID, &dev.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -47,15 +48,15 @@ func (d *DB) RegisterDevice(ctx context.Context, name, deviceKey, os string) (*D
 func (d *DB) ValidateDeviceToken(ctx context.Context, token string) (*Device, error) {
 	var dev Device
 	err := d.pool.QueryRow(ctx,
-		"UPDATE chat.devices SET last_seen=NOW() WHERE token=$1 RETURNING id, name, org_id, token, os, status, COALESCE(local_ip,''), last_seen, created_at",
+		"UPDATE chat.devices SET last_seen=NOW() WHERE token=$1 RETURNING id, name, org_id, token, os, COALESCE(agent_type,''), status, COALESCE(local_ip,''), last_seen, created_at",
 		token,
-	).Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.Status, &dev.LocalIP, &dev.LastSeen, &dev.CreatedAt)
+	).Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.AgentType, &dev.Status, &dev.LocalIP, &dev.LastSeen, &dev.CreatedAt)
 	return &dev, err
 }
 
 func (d *DB) ListDevicesByOrg(ctx context.Context, orgID string) ([]Device, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT id, name, org_id, token, os, status, last_seen, created_at, COALESCE(allow_install_skills,true), COALESCE(allow_install_software,false), COALESCE(local_ip,'') FROM chat.devices WHERE org_id=$1 ORDER BY last_seen DESC", orgID)
+		"SELECT id, name, org_id, token, os, COALESCE(agent_type,''), status, last_seen, created_at, COALESCE(allow_install_skills,true), COALESCE(allow_install_software,false), COALESCE(local_ip,'') FROM chat.devices WHERE org_id=$1 ORDER BY last_seen DESC", orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func (d *DB) ListDevicesByOrg(ctx context.Context, orgID string) ([]Device, erro
 	var devs []Device
 	for rows.Next() {
 		var dev Device
-		if err := rows.Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.Status, &dev.LastSeen, &dev.CreatedAt, &dev.AllowSkills, &dev.AllowSoftware, &dev.LocalIP); err != nil {
+		if err := rows.Scan(&dev.ID, &dev.Name, &dev.OrgID, &dev.Token, &dev.OS, &dev.AgentType, &dev.Status, &dev.LastSeen, &dev.CreatedAt, &dev.AllowSkills, &dev.AllowSoftware, &dev.LocalIP); err != nil {
 			return nil, err
 		}
 		devs = append(devs, dev)
@@ -196,7 +197,11 @@ func (db *DB) UpdateDeviceLastSeen(ctx context.Context, deviceID string) error {
 }
 
 // UpdateDeviceHeartbeat updates last_seen and local_ip in one shot
-func (db *DB) UpdateDeviceHeartbeat(ctx context.Context, deviceID, ip string) error {
+func (db *DB) UpdateDeviceHeartbeat(ctx context.Context, deviceID, ip, agentType string) error {
+	if agentType != "" {
+		_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW(), local_ip=$2, agent_type=$3 WHERE id=$1", deviceID, ip, agentType)
+		return err
+	}
 	_, err := db.pool.Exec(ctx, "UPDATE chat.devices SET last_seen=NOW(), local_ip=$2 WHERE id=$1", deviceID, ip)
 	return err
 }
