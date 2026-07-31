@@ -171,6 +171,54 @@ func (h *HTTPHandler) DownloadDocument(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
+// PreviewDocument streams a merchant's document inline so it can be viewed in
+// the browser (PDF/images/text) instead of downloaded. Supports Range requests
+// via http.ServeContent so the browser's native PDF viewer works.
+func (h *HTTPHandler) PreviewDocument(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	id, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid document id", 400)
+		return
+	}
+	doc, err := h.db.GetDocument(r.Context(), id)
+	if err != nil {
+		jsonError(w, "document not found", 404)
+		return
+	}
+	merchantID, err := h.db.OrgIDForBotID(r.Context(), botID)
+	if err != nil || doc.MerchantID != merchantID {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+	path := filepath.Join(h.docsDir, doc.StoragePath)
+	f, err := os.Open(path)
+	if err != nil {
+		jsonError(w, "file missing on disk", 404)
+		return
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		jsonError(w, "cannot stat file", 500)
+		return
+	}
+
+	contentType := doc.MIME
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = mime.TypeByExtension(filepath.Ext(doc.Filename))
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	asciiName := sanitizeASCII(doc.Filename)
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("inline; filename=\"%s\"; filename*=UTF-8''%s", asciiName, url.PathEscape(doc.Filename)))
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, doc.Filename, st.ModTime(), f)
+}
+
 // randomHex returns n random bytes as lowercase hex.
 func randomHex(n int) string {
 	b := make([]byte, n)

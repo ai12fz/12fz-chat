@@ -102,6 +102,7 @@ func main() {
 	api.HandleFunc("/documents", httpHandler.UploadDocument).Methods("POST")
 	api.HandleFunc("/documents", httpHandler.ListDocuments).Methods("GET")
 	api.HandleFunc("/documents/{id}/download", httpHandler.DownloadDocument).Methods("GET")
+	api.HandleFunc("/documents/{id}/preview", httpHandler.PreviewDocument).Methods("GET")
 	api.HandleFunc("/device-command", httpHandler.DeviceCommand).Methods("POST")
 
 	// Admin API: /api/admin/* (AuthMiddleware + AdminOnly) — migrated from public /admin/proxy/*

@@ -70,7 +70,7 @@
         <button class="refresh-btn" @click="loadDocs" title="刷新">⟳</button>
       </div>
       <nav class="session-list">
-        <div v-for="d in docs" :key="d.id" class="session-item" @click="downloadDoc(d.id)">
+        <div v-for="d in docs" :key="d.id" class="session-item" @click="previewDoc(d)">
           <span class="avatar sm" style="background: #fa8c16">📄</span>
           <div class="session-info">
             <div class="session-top">
@@ -79,6 +79,7 @@
             <span class="session-msg">{{ formatSize(d.size) }} · {{ formatTime(d.created_at) }}</span>
           </div>
           <button class="doc-dl-btn" @click.stop="downloadDoc(d.id)">下载</button>
+          <button class="doc-view-btn" @click.stop="previewDoc(d)">查看</button>
         </div>
         <div v-if="docs.length === 0" class="empty-hint">暂无文档</div>
       </nav>
@@ -96,6 +97,29 @@
           <p v-if="profileMsg" class="profile-msg">{{ profileMsg }}</p>
         </div>
         <button class="close-btn" @click="showProfile = false">关闭</button>
+      </div>
+    </div>
+
+    <div v-if="preview.show" class="preview-overlay" @click.self="closePreview">
+      <div class="preview-card">
+        <div class="preview-header">
+          <span class="preview-title" :title="preview.doc?.title">{{ preview.doc?.title || '文档预览' }}</span>
+          <div class="preview-actions">
+            <button class="preview-dl-btn" @click="downloadDoc(preview.doc?.id)">下载</button>
+            <button class="preview-close-btn" @click="closePreview">✕</button>
+          </div>
+        </div>
+        <div class="preview-body">
+          <div v-if="preview.loading" class="preview-hint">加载中...</div>
+          <div v-else-if="preview.error" class="preview-hint preview-error">{{ preview.error }}</div>
+          <iframe v-else-if="preview.kind === 'pdf'" class="preview-frame" :src="preview.url"></iframe>
+          <img v-else-if="preview.kind === 'image'" class="preview-img" :src="preview.url" alt="文档图片" />
+          <div v-else-if="preview.kind === 'text'" class="preview-text">{{ preview.text }}</div>
+          <div v-else class="preview-hint">
+            该格式暂不支持在线预览,请下载后查看
+            <br /><button class="preview-dl-btn" @click="downloadDoc(preview.doc?.id)">下载文档</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -124,6 +148,45 @@ const showAddFriend = ref(false)
 const showProfile = ref(false)
 const newNickname = ref('')
 const profileMsg = ref('')
+
+// ── Document preview ──
+const preview = ref({ show: false, doc: null as any, url: '', kind: '', text: '', loading: false, error: '' })
+
+function previewKind(d: any): string {
+  const name = (d.filename || d.title || '').toLowerCase()
+  if (name.endsWith('.pdf')) return 'pdf'
+  if (/\.(png|jpe?g|gif|webp|bmp|svg)$/.test(name)) return 'image'
+  if (/\.(txt|md|markdown|json|log|csv)$/.test(name)) return 'text'
+  return 'unsupported'
+}
+
+async function previewDoc(d: any) {
+  const token = localStorage.getItem('token') || ''
+  const kind = previewKind(d)
+  preview.value = { show: true, doc: d, url: '', kind, text: '', loading: kind !== 'unsupported', error: '' }
+  if (kind === 'unsupported') return
+  try {
+    const res = await fetch('/api/documents/' + d.id + '/preview', {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+    if (!res.ok) { preview.value.error = '预览失败: HTTP ' + res.status; preview.value.loading = false; return }
+    const blob = await res.blob()
+    if (kind === 'text') {
+      preview.value.text = await blob.text()
+    } else {
+      preview.value.url = URL.createObjectURL(blob)
+    }
+    preview.value.loading = false
+  } catch (e) {
+    preview.value.error = '预览失败: ' + e
+    preview.value.loading = false
+  }
+}
+
+function closePreview() {
+  if (preview.value.url) URL.revokeObjectURL(preview.value.url)
+  preview.value = { show: false, doc: null, url: '', kind: '', text: '', loading: false, error: '' }
+}
 
 const displayName = computed(() => auth.user?.nickname || auth.user?.username || '用户')
 const userId = computed(() => localStorage.getItem('user_id') || auth.user?.user_id || '')
@@ -472,4 +535,63 @@ loadFriends()
   cursor: pointer;
 }
 .doc-dl-btn:hover { background: #e6f7ff; }
+.doc-view-btn {
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid #52c41a;
+  color: #52c41a;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.doc-view-btn:hover { background: #f6ffed; }
+
+.preview-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,.5); z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-card {
+  background: #fff; border-radius: 8px;
+  width: min(900px, 92vw); height: min(720px, 88vh);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid #f0f0f0;
+}
+.preview-title {
+  font-size: 14px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; min-width: 0;
+}
+.preview-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.preview-dl-btn {
+  padding: 3px 12px; font-size: 12px;
+  border: 1px solid #1890ff; color: #1890ff; background: #fff;
+  border-radius: 4px; cursor: pointer;
+}
+.preview-dl-btn:hover { background: #e6f7ff; }
+.preview-close-btn {
+  padding: 3px 10px; font-size: 13px;
+  border: 1px solid #d9d9d9; color: #666; background: #fff;
+  border-radius: 4px; cursor: pointer;
+}
+.preview-close-btn:hover { background: #f0f0f0; }
+.preview-body { flex: 1; min-height: 0; background: #fafafa; display: flex; flex-direction: column; }
+.preview-frame { width: 100%; height: 100%; border: none; flex: 1; }
+.preview-img { max-width: 100%; max-height: 100%; object-fit: contain; margin: auto; display: block; }
+.preview-text {
+  flex: 1; overflow: auto; margin: 12px; padding: 16px;
+  background: #fff; border: 1px solid #eee; border-radius: 4px;
+  font-size: 13px; line-height: 1.7; white-space: pre-wrap;
+  word-break: break-word; font-family: 'Microsoft YaHei', sans-serif;
+}
+.preview-hint {
+  margin: auto; text-align: center; color: #888; font-size: 13px;
+  line-height: 2.2;
+}
+.preview-error { color: #f5222d; }
 </style>
