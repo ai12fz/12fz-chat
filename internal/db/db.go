@@ -132,6 +132,30 @@ func (d *DB) AutoMigrate(ctx context.Context) error {
 			"PRIMARY KEY (user_id, friend_id)" +
 			")",
 
+		// Merchant-scoped documents produced by agents/bots.
+		"CREATE TABLE IF NOT EXISTS chat.documents (" +
+			"id BIGSERIAL PRIMARY KEY," +
+			"merchant_id TEXT NOT NULL," +
+			"bot_id TEXT NOT NULL DEFAULT ''," +
+			"user_id TEXT NOT NULL DEFAULT ''," +
+			"title TEXT NOT NULL DEFAULT ''," +
+			"filename TEXT NOT NULL," +
+			"size BIGINT NOT NULL DEFAULT 0," +
+			"mime TEXT NOT NULL DEFAULT ''," +
+			"storage_path TEXT NOT NULL," +
+			"download_count BIGINT NOT NULL DEFAULT 0," +
+			"created_at TIMESTAMPTZ DEFAULT NOW()" +
+			")",
+
+		"CREATE INDEX IF NOT EXISTS idx_documents_merchant ON chat.documents(merchant_id, id DESC)",
+
+		// Per-merchant document retention limits (tiered-pricing hook).
+		"CREATE TABLE IF NOT EXISTS chat.doc_quotas (" +
+			"merchant_id TEXT PRIMARY KEY," +
+			"doc_limit INT NOT NULL DEFAULT 20," +
+			"updated_at TIMESTAMPTZ DEFAULT NOW()" +
+			")",
+
 		// Add last_msg_at column if it doesn't exist (for existing databases)
 		"DO $$ BEGIN " +
 			"ALTER TABLE chat.groups ADD COLUMN IF NOT EXISTS last_msg_at TIMESTAMPTZ DEFAULT NOW(); " +
