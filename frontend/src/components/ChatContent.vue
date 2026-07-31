@@ -24,7 +24,10 @@
           <div v-if="String(msg.sender_id) === String(auth.userId)" class="message self">
             <div class="msg-body">
               <div class="msg-content self-msg">{{ msg.content }}</div>
-              <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
+              <div class="msg-meta">
+                <button class="copy-btn" @click="copyMsg(msg.content)" title="复制">📋</button>
+                <span class="msg-time">{{ formatTime(msg.created_at) }}</span>
+              </div>
             </div>
           </div>
           <div v-else class="message other">
@@ -32,7 +35,10 @@
             <div class="msg-body">
               <div class="msg-sender">{{ msg.sender_id }}</div>
               <div class="msg-content other-msg">{{ msg.content }}</div>
-              <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
+              <div class="msg-meta">
+                <button class="copy-btn" @click="copyMsg(msg.content)" title="复制">📋</button>
+                <span class="msg-time">{{ formatTime(msg.created_at) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -227,6 +233,22 @@ function sendFiles(files: FileList) {
   }
 }
 
+async function copyMsg(content: string) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(content)
+    } else {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea')
+      ta.value = content
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+  } catch(e) { /* ignore */ }
+}
+
 function formatTime(iso: string) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -417,11 +439,31 @@ watch(() => chat.activeId, async () => {
   border-bottom-left-radius: 2px;
   box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.message.self .msg-meta { justify-content: flex-end; }
+.message.other .msg-meta { justify-content: flex-start; }
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity .15s;
+  line-height: 1;
+}
+.message-row:hover .copy-btn { opacity: .6; }
+.copy-btn:hover { opacity: 1 !important; }
+
 .msg-time {
   font-size: 10px;
   color: #aaa;
-  margin-top: 2px;
-  text-align: right;
 }
 .message.other .msg-time { text-align: left; }
 
