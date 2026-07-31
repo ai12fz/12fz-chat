@@ -12,6 +12,69 @@ USER_ID = cfg.get("user_id", "1")
 API_BASE = "https://%s" % WS_HOST
 HEADERS = {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"}
 
+# ── document delivery (outbox dir → /api/documents) ──
+DOC_DIR = cfg.get("doc_dir", "C:\\Users\\Administrator\\research")
+DOC_EXT = {".md", ".pdf", ".docx", ".xlsx", ".pptx", ".txt", ".csv", ".zip", ".gz", ".png", ".jpg", ".jpeg", ".webp"}
+DOC_STATE = os.path.expanduser("~/.hermes/docs_uploaded.json")
+
+def _load_doc_state():
+    try:
+        with open(DOC_STATE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def _save_doc_state(state):
+    try:
+        with open(DOC_STATE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+    except Exception as e:
+        print("[bridge] doc state save err: %s" % e, flush=True)
+
+def upload_new_docs(reply):
+    """Upload new files from DOC_DIR to /api/documents; append [doc:id] markers."""
+    try:
+        if not os.path.isdir(DOC_DIR):
+            return reply
+        state = set(_load_doc_state())
+        markers = []
+        for name in sorted(os.listdir(DOC_DIR)):
+            path = os.path.join(DOC_DIR, name)
+            if not os.path.isfile(path):
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in DOC_EXT:
+                continue
+            st = os.stat(path)
+            key = "%s|%d|%d" % (path, st.st_size, int(st.st_mtime))
+            if key in state:
+                continue
+            try:
+                title = os.path.splitext(name)[0]
+                with open(path, "rb") as fh:
+                    r = requests.post(
+                        API_BASE + "/api/documents",
+                        headers={"Authorization": "Bearer " + TOKEN},
+                        files={"file": (name, fh)},
+                        data={"title": title, "user_id": USER_ID},
+                        timeout=60)
+                if r.status_code in (200, 201):
+                    doc = r.json()
+                    markers.append("[doc:%s] %s" % (doc.get("id"), doc.get("title") or name))
+                    state.add(key)
+                    print("[bridge] doc uploaded id=%s %s (%dB)" % (doc.get("id"), name, st.st_size), flush=True)
+                else:
+                    print("[bridge] doc upload %s -> HTTP %d" % (name, r.status_code), flush=True)
+            except Exception as e:
+                print("[bridge] doc upload err %s: %s" % (name, e), flush=True)
+        if markers:
+            _save_doc_state(list(state))
+            return reply.rstrip() + "\n\n📎 文档已生成，可点击上方卡片下载：\n" + "\n".join(markers)
+        return reply
+    except Exception as e:
+        print("[bridge] upload_new_docs err: %s" % e, flush=True)
+        return reply
+
 # ── capability map: name→{id,icon,desc} ──
 CAP_MAP = {}
 
@@ -175,6 +238,9 @@ def on_message(ws, raw):
         stop_ping.set()
         reply = "err: %s" % e
 
+    # Upload new deliverable files and append doc markers to the reply
+    reply = upload_new_docs(reply)
+
     try:
         resp = requests.post(
             API_BASE + "/api/friend-messages",
@@ -199,17 +265,6 @@ def hb_loop():
         time.sleep(55)
         try:
             requests.post(API_BASE + "/api/devices/heartbeat", headers=HEADERS, timeout=10)
-            # ── report local ip ──
-            try:
-                import socket
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                local_ip = s.getsockname()[0]
-                s.close()
-                if local_ip:
-                    requests.post(API_BASE + "/api/devices/activity", headers=HEADERS, json={"action": "local_ip", "detail": local_ip}, timeout=10)
-            except Exception:
-                pass
             # ── sync model config from server ──
             sync_model_config()
         except Exception:
