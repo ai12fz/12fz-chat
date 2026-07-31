@@ -24,8 +24,8 @@
             <td>{{ rc.device_id || '—' }}</td>
             <td>{{ fmt(rc.created_at) }}</td>
             <td>
-              <button class="btn-sm" :disabled="rc.status!=='active'" @click="copyText('curl -s https://ai.12fz.com/static/install-device.sh | bash -s -- --code=' + rc.code)">🐧 Linux 命令</button>
-              <button class="btn-sm" :disabled="rc.status!=='active'" @click="copyText('powershell -ExecutionPolicy Bypass -Command \"iwr https://ai.12fz.com/static/install-device.ps1 -OutFile $env:TEMP\\install-device.ps1; & $env:TEMP\\install-device.ps1 -Code ' + rc.code + '\"')">🪟 Windows 命令</button>
+              <button class="btn-sm" :disabled="rc.status!=='active'" @click="copyText(linuxCmd(rc.code))">🐧 Linux 命令</button>
+              <button class="btn-sm" :disabled="rc.status!=='active'" @click="copyText(winCmd(rc.code))">🪟 Windows 命令</button>
               <button v-if="rc.status==='active'" class="btn-danger btn-sm" @click="revokeCode(rc.code)">撤销</button>
             </td>
           </tr>
@@ -206,6 +206,17 @@ function fmt(t: string) {
 function agentLabel(t?: string) {
   const m: Record<string, string> = { '12fzclaw': '12fzclaw', openclaw: 'openclaw', hermes: 'Hermes' }
   return m[t || ''] || (t || '—')
+}
+
+function linuxCmd(code: string) {
+  return 'curl -s https://ai.12fz.com/static/install-device.sh | bash -s -- --code=' + code
+}
+
+function winCmd(code: string) {
+  // PowerShell 一键安装: 下载 ps1 → 执行 -Code 注册
+  const dl = 'iwr https://ai.12fz.com/static/install-device.ps1 -OutFile $env:TEMP\\install-device.ps1'
+  const ex = '& $env:TEMP\\install-device.ps1 -Code ' + code
+  return 'powershell -ExecutionPolicy Bypass -Command "' + dl + '; ' + ex + '"'
 }
 </script>
 
