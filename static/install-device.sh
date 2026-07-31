@@ -3,7 +3,7 @@
 # 12FZ 设备一键接入 — 自动识别已装 agent,注册并部署 bridge
 # ============================================================
 # 用法(Linux/macOS):
-#   curl -s https://ai.12fz.com/install-device.sh | bash -s -- --code=dev-xxx
+#   curl -s https://ai.12fz.com/static/install-device.sh | bash -s -- --code=dev-xxx
 #   可选参数:
 #     --name=设备名       默认 <agent>-linux-<hostname>(自动唯一)
 #     --agent=hermes|12fzclaw|openclaw   强制指定类型,默认自动识别
@@ -51,10 +51,11 @@ CONFIG="$HOME/.hermes/12fz-bridge.json"
 
 # ---------- 幂等: 已装过则跳过注册 ----------
 if [ -f "$CONFIG" ]; then
-  OLD_AGENT=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('agent_type',''))" 2>/dev/null || echo "")
+  OLD_AGENT=$(python3 -c "import json;print(json.load(open('$CONFIG')).get('agent_type',''))" 2>/dev/null || python -c "import json;print(json.load(open('$CONFIG')).get('agent_type',''))" 2>/dev/null || echo "")
   if [ -n "$OLD_AGENT" ] && [ "$OLD_AGENT" != "$AGENT_TYPE" ]; then
     echo "== 已安装(agent=$OLD_AGENT),更新为 $AGENT_TYPE ..."
-    python3 - "$CONFIG" "$AGENT_TYPE" <<'PYEOF'
+    PY=$(command -v python3 || command -v python)
+    "$PY" - "$CONFIG" "$AGENT_TYPE" <<'PYEOF'
 import json, sys
 p, a = sys.argv[1], sys.argv[2]
 c = json.load(open(p, encoding="utf-8"))
@@ -75,5 +76,5 @@ echo "== 下载 setup 脚本..."
 SETUP=$(mktemp)
 curl -fsSL "https://$WS_HOST/static/12fz-bridge-setup.sh" -o "$SETUP" \
   || { echo "!! 下载 setup 失败,请检查网络/服务器"; rm -f "$SETUP"; exit 1; }
-bash "$SETUP" "$BOT_ID" "$AGENT_TYPE" "$REG_CODE"
+WS_HOST=$WS_HOST bash "$SETUP" "$BOT_ID" "$AGENT_TYPE" "$REG_CODE"
 rm -f "$SETUP"
