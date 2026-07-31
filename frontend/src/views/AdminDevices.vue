@@ -39,7 +39,7 @@
     </div>
 
     <table v-if="devices.length" class="table">
-      <thead><tr><th>设备名</th><th>状态</th><th>模型</th><th>Token</th><th>系统</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
+      <thead><tr><th>设备名</th><th>状态</th><th>模型</th><th>Token</th><th>系统</th><th>本地IP</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="d in devices" :key="d.id">
           <td><span @dblclick="startRename(d)" title="双击改名">{{ d.name }}</span></td>
@@ -51,6 +51,7 @@
           </td>
           <td><code>{{ (d.token||'').slice(0, 12) }}...</code></td>
           <td>{{ d.os || '—' }}</td>
+          <td>{{ d.local_ip || '—' }}</td>
           <td>{{ fmt(d.last_seen) }}</td>
           <td><label class="switch"><input type="checkbox" :checked="d.allow_install_skills" @change="toggleSkills(d)"><span class="slider"></span></label></td>
           <td><label class="switch"><input type="checkbox" :checked="d.allow_install_software" @change="toggleSoftware(d)"><span class="slider"></span></label></td>
