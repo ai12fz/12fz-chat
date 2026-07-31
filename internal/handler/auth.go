@@ -42,12 +42,6 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 			return botID, nil
 		}
 	}
-	if strings.Count(token, ".") >= 2 && !strings.HasPrefix(token, "sk-") && !strings.HasPrefix(token, "d_") && !strings.HasPrefix(token, "session-") {
-		return "1", nil
-	}
-	if strings.Count(token, ".") >= 2 && !strings.HasPrefix(token, "sk-") && !strings.HasPrefix(token, "d_") && !strings.HasPrefix(token, "session-") {
-		return "1", nil
-	}
 	if strings.HasPrefix(token, "session-") {
 		return token[8:], nil
 	}

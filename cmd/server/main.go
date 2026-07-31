@@ -82,22 +82,6 @@ func main() {
 
 	
 
-	r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
-	// Proxy admin (public - auth handled internally or via nginx)
-	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
-	r.HandleFunc("/admin/proxy/models", httpHandler.ProxyListModels).Methods("GET")
-	r.HandleFunc("/admin/proxy/models", httpHandler.ProxyCreateModel).Methods("POST")
-	r.HandleFunc("/admin/proxy/models/{id}", httpHandler.ProxyUpdateModel).Methods("PUT")
-	r.HandleFunc("/admin/proxy/models/{id}", httpHandler.ProxyDeleteModel).Methods("DELETE")
-	r.HandleFunc("/admin/proxy/pricing", httpHandler.ProxyGetPricing).Methods("GET")
-	r.HandleFunc("/admin/proxy/pricing/{key}", httpHandler.ProxyUpdatePricingItem).Methods("PUT")
-	r.HandleFunc("/admin/proxy/pricing/multiplier", httpHandler.ProxyUpdateMultiplier).Methods("PUT")
-	r.HandleFunc("/admin/proxy/merchants", httpHandler.ProxyListMerchants).Methods("GET")
-	r.HandleFunc("/admin/proxy/merchants/{org_id}/recharge", httpHandler.ProxyRechargeMerchant).Methods("POST")
-	r.HandleFunc("/admin/proxy/merchants/{org_id}/ledger", httpHandler.ProxyMerchantLedger).Methods("GET")
-	r.HandleFunc("/admin/proxy/keys", httpHandler.ProxyListKeys).Methods("GET")
-	r.HandleFunc("/admin/proxy/keys", httpHandler.ProxyCreateKey).Methods("POST")
-	r.HandleFunc("/admin/proxy/keys/{id}/revoke", httpHandler.ProxyRevokeKey).Methods("POST")
 
 
 	api.HandleFunc("/messages/read", httpHandler.MarkRead).Methods("POST")
@@ -118,8 +102,26 @@ func main() {
 	api.HandleFunc("/documents", httpHandler.UploadDocument).Methods("POST")
 	api.HandleFunc("/documents", httpHandler.ListDocuments).Methods("GET")
 	api.HandleFunc("/documents/{id}/download", httpHandler.DownloadDocument).Methods("GET")
-	api.HandleFunc("/admin/doc-quota", httpHandler.AdminDocQuota).Methods("GET", "PUT")
 	api.HandleFunc("/device-command", httpHandler.DeviceCommand).Methods("POST")
+
+	// Admin API: /api/admin/* (AuthMiddleware + AdminOnly) — migrated from public /admin/proxy/*
+	admin := api.PathPrefix("/admin").Subrouter()
+	admin.Use(httpHandler.AdminOnly)
+	admin.HandleFunc("/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
+	admin.HandleFunc("/proxy/models", httpHandler.ProxyListModels).Methods("GET")
+	admin.HandleFunc("/proxy/models", httpHandler.ProxyCreateModel).Methods("POST")
+	admin.HandleFunc("/proxy/models/{id}", httpHandler.ProxyUpdateModel).Methods("PUT")
+	admin.HandleFunc("/proxy/models/{id}", httpHandler.ProxyDeleteModel).Methods("DELETE")
+	admin.HandleFunc("/proxy/pricing", httpHandler.ProxyGetPricing).Methods("GET")
+	admin.HandleFunc("/proxy/pricing/{key}", httpHandler.ProxyUpdatePricingItem).Methods("PUT")
+	admin.HandleFunc("/proxy/pricing/multiplier", httpHandler.ProxyUpdateMultiplier).Methods("PUT")
+	admin.HandleFunc("/proxy/merchants", httpHandler.ProxyListMerchants).Methods("GET")
+	admin.HandleFunc("/proxy/merchants/{org_id}/recharge", httpHandler.ProxyRechargeMerchant).Methods("POST")
+	admin.HandleFunc("/proxy/merchants/{org_id}/ledger", httpHandler.ProxyMerchantLedger).Methods("GET")
+	admin.HandleFunc("/proxy/keys", httpHandler.ProxyListKeys).Methods("GET")
+	admin.HandleFunc("/proxy/keys", httpHandler.ProxyCreateKey).Methods("POST")
+	admin.HandleFunc("/proxy/keys/{id}/revoke", httpHandler.ProxyRevokeKey).Methods("POST")
+	admin.HandleFunc("/doc-quota", httpHandler.AdminDocQuota).Methods("GET", "PUT")
 
 	// LLM proxy to new-api
 	r.HandleFunc("/v1/chat/completions", httpHandler.ProxyChat).Methods("POST", "OPTIONS")
@@ -136,7 +138,6 @@ func main() {
 	r.HandleFunc("/api/devices/{id}/toggle-software", httpHandler.ToggleDeviceSoftware).Methods("POST")
 	r.HandleFunc("/api/devices/{id}/model", httpHandler.GetDeviceModel).Methods("GET")
 	r.HandleFunc("/api/devices/{id}/model", httpHandler.SetDeviceModel).Methods("PUT")
-	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
 	r.HandleFunc("/api/devices/{id}/activity", httpHandler.GetDeviceActivity).Methods("GET")
 	api.HandleFunc("/devices/activity", httpHandler.PostDeviceActivity).Methods("POST")
 
@@ -145,21 +146,6 @@ func main() {
 	r.HandleFunc("/api/skills/{name}", httpHandler.UpdateSkill).Methods("PUT")
 	r.HandleFunc("/api/skills/{name}", httpHandler.DeleteSkill).Methods("DELETE")
 		r.HandleFunc("/api/devices/agents", httpHandler.DeviceAgents).Methods("GET")
-	// Proxy admin (public - auth handled internally or via nginx)
-	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
-	r.HandleFunc("/admin/proxy/models", httpHandler.ProxyListModels).Methods("GET")
-	r.HandleFunc("/admin/proxy/models", httpHandler.ProxyCreateModel).Methods("POST")
-	r.HandleFunc("/admin/proxy/models/{id}", httpHandler.ProxyUpdateModel).Methods("PUT")
-	r.HandleFunc("/admin/proxy/models/{id}", httpHandler.ProxyDeleteModel).Methods("DELETE")
-	r.HandleFunc("/admin/proxy/pricing", httpHandler.ProxyGetPricing).Methods("GET")
-	r.HandleFunc("/admin/proxy/pricing/{key}", httpHandler.ProxyUpdatePricingItem).Methods("PUT")
-	r.HandleFunc("/admin/proxy/pricing/multiplier", httpHandler.ProxyUpdateMultiplier).Methods("PUT")
-	r.HandleFunc("/admin/proxy/merchants", httpHandler.ProxyListMerchants).Methods("GET")
-	r.HandleFunc("/admin/proxy/merchants/{org_id}/recharge", httpHandler.ProxyRechargeMerchant).Methods("POST")
-	r.HandleFunc("/admin/proxy/merchants/{org_id}/ledger", httpHandler.ProxyMerchantLedger).Methods("GET")
-	r.HandleFunc("/admin/proxy/keys", httpHandler.ProxyListKeys).Methods("GET")
-	r.HandleFunc("/admin/proxy/keys", httpHandler.ProxyCreateKey).Methods("POST")
-	r.HandleFunc("/admin/proxy/keys/{id}/revoke", httpHandler.ProxyRevokeKey).Methods("POST")
 
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")

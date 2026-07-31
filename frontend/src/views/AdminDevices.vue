@@ -104,7 +104,7 @@ async function request(url: string, opts: any = {}) {
 onMounted(loadData)
 onMounted(async () => {
   try {
-    const r = await request('/admin/proxy/models')
+    const r = await request('/api/admin/proxy/models')
     if (Array.isArray(r)) models.value = r
     else if (r.data && Array.isArray(r.data)) models.value = r.data
   } catch(_) {}

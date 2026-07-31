@@ -61,6 +61,17 @@ func (h *HTTPHandler) AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// AdminOnly restricts a subrouter to the platform admin (user id "1").
+func (h *HTTPHandler) AdminOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if getBotID(r) != "1" {
+			http.Error(w, `{"error":"forbidden"}`, 403)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // getBotID extracts bot_id from request context
 func getBotID(r *http.Request) string {
 	if v, ok := r.Context().Value(contextBotID).(string); ok {

@@ -210,18 +210,18 @@ async function call(url: string, opts: any = {}) {
 
 watch(tab, async t => {
   if (t === 'dashboard') {
-    keys.value = await call('/admin/proxy/keys')
+    keys.value = await call('/api/admin/proxy/keys')
     await loadDashboard()
   }
-  if (t === 'models') models.value = await call('/admin/proxy/models')
-  if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
-  if (t === 'merchants') merchants.value = await call('/admin/proxy/merchants')
-  if (t === 'keys') keys.value = await call('/admin/proxy/keys?org_id=' + keyOrgId.value)
+  if (t === 'models') models.value = await call('/api/admin/proxy/models')
+  if (t === 'pricing') { const d = await call('/api/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
+  if (t === 'merchants') merchants.value = await call('/api/admin/proxy/merchants')
+  if (t === 'keys') keys.value = await call('/api/admin/proxy/keys?org_id=' + keyOrgId.value)
 }, { immediate: true })
 
 async function loadDashboard() {
   const q = selectedKey.value ? '?key_id=' + selectedKey.value : ''
-  const d = await call('/admin/proxy/dashboard' + q)
+  const d = await call('/api/admin/proxy/dashboard' + q)
   stats.value = { '今日': d.today, '本月': d.month }
   dailyData.value = d.daily || []
   // Build chart data grouped by date+model
@@ -259,24 +259,24 @@ async function loadDashboard() {
   }
   buildCostChart(dailyData.value)
 }
-  if (t === 'models') models.value = await call('/admin/proxy/models')
-  if (t === 'pricing') { const d = await call('/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
-  if (t === 'merchants') merchants.value = await call('/admin/proxy/merchants')
+  if (t === 'models') models.value = await call('/api/admin/proxy/models')
+  if (t === 'pricing') { const d = await call('/api/admin/proxy/pricing'); pricing.value = d.items || []; multiplier.value = d.multiplier || 2 }
+  if (t === 'merchants') merchants.value = await call('/api/admin/proxy/merchants')
 
 function openModel(m?: any) { editModel.value = m ? { ...m } : { name: '', display_name: '', provider: '', endpoint: '', api_key: '', status: 'active', priority: 0, max_rpm: 60 }; showModel.value = true }
 async function saveModel() {
   const m = editModel.value
-  if (m.id) await call('/admin/proxy/models/' + m.id, { method: 'PUT', body: JSON.stringify(m) })
-  else await call('/admin/proxy/models', { method: 'POST', body: JSON.stringify(m) })
-  showModel.value = false; models.value = await call('/admin/proxy/models')
+  if (m.id) await call('/api/admin/proxy/models/' + m.id, { method: 'PUT', body: JSON.stringify(m) })
+  else await call('/api/admin/proxy/models', { method: 'POST', body: JSON.stringify(m) })
+  showModel.value = false; models.value = await call('/api/admin/proxy/models')
 }
-async function deleteModel(m: any) { if (confirm('删除 ' + m.display_name + '?')) { await call('/admin/proxy/models/' + m.id, { method: 'DELETE' }); models.value = await call('/admin/proxy/models') } }
-async function savePricing() { for (const p of pricing.value) if (p.key !== 'pricing_multiplier') await call('/admin/proxy/pricing/' + p.key, { method: 'PUT', body: JSON.stringify({ amount: p.amount, active: p.active }) }); alert('已保存') }
-async function applyMultiplier() { await call('/admin/proxy/pricing/multiplier', { method: 'PUT', body: JSON.stringify({ multiplier: multiplier.value }) }); pricing.value = (await call('/admin/proxy/pricing')).items || []; alert('倍数已应用') }
-async function recharge(m: any) { const amount = prompt('充值金额(元)'); if (amount) { await call('/admin/proxy/merchants/' + m.org_id + '/recharge', { method: 'POST', body: JSON.stringify({ amount: parseFloat(amount) }) }); merchants.value = await call('/admin/proxy/merchants') } }
-async function showLedger(m: any) { ledger.value = await call('/admin/proxy/merchants/' + m.org_id + '/ledger') }
-async function createKey() { const r = await call('/admin/proxy/keys', { method: 'POST', body: JSON.stringify({ org_id: keyOrgId.value, name: keyName.value }) }); alert('Key: ' + (r as any).key_text); keys.value = await call('/admin/proxy/keys?org_id=' + keyOrgId.value) }
-async function revokeKey(k: any) { await call('/admin/proxy/keys/' + k.id + '/revoke', { method: 'POST' }); keys.value = await call('/admin/proxy/keys?org_id=' + k.org_id) }
+async function deleteModel(m: any) { if (confirm('删除 ' + m.display_name + '?')) { await call('/api/admin/proxy/models/' + m.id, { method: 'DELETE' }); models.value = await call('/api/admin/proxy/models') } }
+async function savePricing() { for (const p of pricing.value) if (p.key !== 'pricing_multiplier') await call('/api/admin/proxy/pricing/' + p.key, { method: 'PUT', body: JSON.stringify({ amount: p.amount, active: p.active }) }); alert('已保存') }
+async function applyMultiplier() { await call('/api/admin/proxy/pricing/multiplier', { method: 'PUT', body: JSON.stringify({ multiplier: multiplier.value }) }); pricing.value = (await call('/api/admin/proxy/pricing')).items || []; alert('倍数已应用') }
+async function recharge(m: any) { const amount = prompt('充值金额(元)'); if (amount) { await call('/api/admin/proxy/merchants/' + m.org_id + '/recharge', { method: 'POST', body: JSON.stringify({ amount: parseFloat(amount) }) }); merchants.value = await call('/api/admin/proxy/merchants') } }
+async function showLedger(m: any) { ledger.value = await call('/api/admin/proxy/merchants/' + m.org_id + '/ledger') }
+async function createKey() { const r = await call('/api/admin/proxy/keys', { method: 'POST', body: JSON.stringify({ org_id: keyOrgId.value, name: keyName.value }) }); alert('Key: ' + (r as any).key_text); keys.value = await call('/api/admin/proxy/keys?org_id=' + keyOrgId.value) }
+async function revokeKey(k: any) { await call('/api/admin/proxy/keys/' + k.id + '/revoke', { method: 'POST' }); keys.value = await call('/api/admin/proxy/keys?org_id=' + k.org_id) }
 function segH(v: number) { return Math.max((v/chartMax.value)*140, 2)+'px' }
 
 </script>
