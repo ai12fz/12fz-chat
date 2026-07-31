@@ -12,6 +12,7 @@ type Config struct {
 	PGConnStr string
 	JWTSecret string
 	BotTokens map[string]string
+	DocsDir   string
 }
 
 func (c *Config) PGConnString() string { return c.PGConnStr }
@@ -32,6 +33,7 @@ func Load() *Config {
 		PGConnStr: getEnv("PG_CONN", "postgresql://app_zhongtai:@localhost:5432/12fzsj?sslmode=disable"),
 		JWTSecret: getEnv("JWT_SECRET", "12fz-chat-secret-2026"),
 		BotTokens: bt,
+		DocsDir:   getEnv("DOCS_DIR", "/root/12fzwebsocket/docs"),
 	}
 }
 

@@ -47,7 +47,7 @@ func main() {
 
 	// Init handlers
 	msgHandler := handler.NewMessageHandler(database, hub)
-	httpHandler := handler.NewHTTPHandler(database, hub, authHandler)
+	httpHandler := handler.NewHTTPHandler(database, hub, authHandler, cfg.DocsDir)
 
 	// Setup router
 	r := mux.NewRouter()
@@ -115,6 +115,11 @@ func main() {
 	api.HandleFunc("/friends/action", httpHandler.HandleFriendRequest).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.SendFriendMessage).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.GetFriendMessages).Methods("GET")
+	// Documents (merchant-scoped files produced by agents/bots)
+	api.HandleFunc("/documents", httpHandler.UploadDocument).Methods("POST")
+	api.HandleFunc("/documents", httpHandler.ListDocuments).Methods("GET")
+	api.HandleFunc("/documents/{id}/download", httpHandler.DownloadDocument).Methods("GET")
+	api.HandleFunc("/admin/doc-quota", httpHandler.AdminDocQuota).Methods("GET", "PUT")
 	api.HandleFunc("/device-command", httpHandler.DeviceCommand).Methods("POST")
 
 	// LLM proxy to new-api
