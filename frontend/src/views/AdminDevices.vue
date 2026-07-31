@@ -38,6 +38,19 @@
       </div>
     </div>
 
+    <div class="key-card">
+      <h3>📄 文档配额（商户保留文档数，默认 20，阶梯收费用）</h3>
+      <div class="quota-row">
+        <label>商户ID(org_id)</label>
+        <input v-model="quotaMerchantId" placeholder="00000000-0000-0000-0000-000000000000" class="quota-input" />
+        <label>保留份数</label>
+        <input v-model.number="quotaLimit" type="number" min="1" max="1000" class="quota-input" style="width:80px" />
+        <button class="btn-primary btn-sm" @click="saveQuota">保存</button>
+        <button class="btn-outline btn-sm" @click="loadQuota">查询</button>
+        <span v-if="quotaMsg" class="quota-msg">{{ quotaMsg }}</span>
+      </div>
+    </div>
+
     <table v-if="devices.length" class="table">
       <thead><tr><th>设备名</th><th>状态</th><th>模型</th><th>Token</th><th>系统</th><th>本地IP</th><th>最后上线</th><th>技能安装</th><th>软件安装</th><th>操作</th></tr></thead>
       <tbody>
@@ -70,6 +83,9 @@ const devices = ref<any[]>([])
 const regCodes = ref<any[]>([])
 const models = ref<any[]>([])
 const showAllCodes = ref(false)
+const quotaMerchantId = ref('00000000-0000-0000-0000-000000000000')
+const quotaLimit = ref(20)
+const quotaMsg = ref('')
 const defaultShowCount = 2
 
 const visibleCodes = computed(() => {
@@ -93,6 +109,25 @@ onMounted(async () => {
     else if (r.data && Array.isArray(r.data)) models.value = r.data
   } catch(_) {}
 })
+
+async function loadQuota() {
+  try {
+    const r = await request('/api/admin/doc-quota?merchant_id=' + encodeURIComponent(quotaMerchantId.value))
+    if (r && r.doc_limit) quotaLimit.value = r.doc_limit
+    quotaMsg.value = r && r.doc_limit ? '当前配额: ' + r.doc_limit + ' 份' : (r.error || '未查到')
+  } catch(e) { quotaMsg.value = '查询失败' }
+}
+
+async function saveQuota() {
+  if (!quotaMerchantId.value) { quotaMsg.value = '请填写商户ID'; return }
+  try {
+    const r = await request('/api/admin/doc-quota', {
+      method: 'PUT',
+      body: JSON.stringify({ merchant_id: quotaMerchantId.value, doc_limit: quotaLimit.value })
+    })
+    quotaMsg.value = r.doc_limit ? '已保存: ' + r.doc_limit + ' 份' : (r.error || '保存失败')
+  } catch(e) { quotaMsg.value = '保存失败' }
+}
 
 async function loadData() {
   try {
@@ -192,4 +227,21 @@ function fmt(t: string) {
 .slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
 input:checked + .slider { background: #22c55e; }
 input:checked + .slider:before { transform: translateX(18px); }
+
+.quota-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.quota-row label { font-size: 13px; color: #666; }
+.quota-input {
+  padding: 5px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 280px;
+}
+.quota-msg { font-size: 12px; color: #52c41a; margin-left: 6px; }
 </style>

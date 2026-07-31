@@ -1048,6 +1048,13 @@ func (h *HTTPHandler) PostDeviceActivity(w http.ResponseWriter, r *http.Request)
 	json.NewDecoder(r.Body).Decode(&body)
 	if body.Action == "" { body.Action = "unknown" }
 	h.db.LogDeviceActivity(r.Context(), deviceID, body.Action, body.Detail)
+	// local_ip 上报：更新设备本地IP
+	if body.Action == "local_ip" && body.Detail != "" {
+		if err := h.db.SetDeviceLocalIP(r.Context(), deviceID, body.Detail); err != nil {
+			// 记录失败但不阻断上报
+			h.db.LogDeviceActivity(r.Context(), deviceID, "local_ip_error", err.Error())
+		}
+	}
 	jsonResp(w, map[string]string{"status": "ok"}, 200)
 }
 

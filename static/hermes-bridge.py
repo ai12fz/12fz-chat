@@ -141,7 +141,8 @@ def on_message(ws, raw):
         full_out = bytes().join(reply_bytes).decode("utf-8", errors="replace")
         # Strip ANSI escape codes and CR
         full_out = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', full_out)
-        full_out = full_out.replace('\r', '')
+        full_out = full_out.replace('\r', '')
+
         # Extract AI response from box structure: split on ╭ (U+256d)
         parts = full_out.split('\u256d')
         reply = parts[-1].strip() if len(parts) > 1 else full_out.strip()
@@ -198,6 +199,17 @@ def hb_loop():
         time.sleep(55)
         try:
             requests.post(API_BASE + "/api/devices/heartbeat", headers=HEADERS, timeout=10)
+            # ── report local ip ──
+            try:
+                import socket
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+                s.close()
+                if local_ip:
+                    requests.post(API_BASE + "/api/devices/activity", headers=HEADERS, json={"action": "local_ip", "detail": local_ip}, timeout=10)
+            except Exception:
+                pass
             # ── sync model config from server ──
             sync_model_config()
         except Exception:

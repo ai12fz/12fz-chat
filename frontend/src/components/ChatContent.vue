@@ -23,7 +23,12 @@
         <div v-for="msg in session.messages" :key="msg.id" class="message-row">
           <div v-if="String(msg.sender_id) === String(auth.userId)" class="message self">
             <div class="msg-body">
-              <div class="msg-content self-msg">{{ msg.content }}</div>
+              <div class="msg-content self-msg">{{ msgText(msg.content) }}</div>
+              <div v-for="d in msgDocs(msg.content)" :key="d.id" class="doc-card" @click.stop="downloadDoc(d.id)">
+                <span class="doc-card-icon">📄</span>
+                <span class="doc-card-title">{{ d.title }}</span>
+                <button class="doc-card-btn" @click.stop="downloadDoc(d.id)">下载</button>
+              </div>
               <div class="msg-meta">
                 <button class="copy-btn" @click="copyMsg(msg.content)" title="复制">📋</button>
                 <span class="msg-time">{{ formatTime(msg.created_at) }}</span>
@@ -34,7 +39,12 @@
             <span class="msg-avatar" :style="{ background: nameColor(msg.sender_id) }">{{ msg.sender_id[0] }}</span>
             <div class="msg-body">
               <div class="msg-sender">{{ msg.sender_id }}</div>
-              <div class="msg-content other-msg">{{ msg.content }}</div>
+              <div class="msg-content other-msg">{{ msgText(msg.content) }}</div>
+              <div v-for="d in msgDocs(msg.content)" :key="d.id" class="doc-card" @click.stop="downloadDoc(d.id)">
+                <span class="doc-card-icon">📄</span>
+                <span class="doc-card-title">{{ d.title }}</span>
+                <button class="doc-card-btn" @click.stop="downloadDoc(d.id)">下载</button>
+              </div>
               <div class="msg-meta">
                 <button class="copy-btn" @click="copyMsg(msg.content)" title="复制">📋</button>
                 <span class="msg-time">{{ formatTime(msg.created_at) }}</span>
@@ -233,6 +243,56 @@ function sendFiles(files: FileList) {
   }
 }
 
+
+// ── Document cards ──
+// Message content may contain markers: [doc:{id}] {title}
+function msgDocs(content: string) {
+  const docs: { id: string; title: string }[] = []
+  if (!content) return docs
+  const re = /\[doc:(\d+)\][ \t]*([^\n\r]*)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content)) !== null) {
+    docs.push({ id: m[1], title: (m[2] || '文档').trim() })
+  }
+  return docs
+}
+
+function msgText(content: string) {
+  if (!content) return ''
+  return content.replace(/\[doc:\d+\][ \t]*[^\n\r]*/g, '').replace(/\n{2,}/g, '\n').trim()
+}
+
+async function downloadDoc(id: string) {
+  const token = localStorage.getItem('token') || ''
+  try {
+    const res = await fetch('/api/documents/' + id + '/download', {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+    if (!res.ok) {
+      alert('下载失败: HTTP ' + res.status)
+      return
+    }
+    const blob = await res.blob()
+    let filename = 'doc-' + id
+    const cd = res.headers.get('Content-Disposition') || ''
+    const m = cd.match(/filename\*=UTF-8''([^;]+)/)
+    if (m) filename = decodeURIComponent(m[1])
+    else {
+      const m2 = cd.match(/filename="([^"]+)"/)
+      if (m2) filename = m2[1]
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  } catch (e) {
+    alert('下载失败: ' + e)
+  }
+}
 async function copyMsg(content: string) {
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -584,4 +644,39 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   color: #888;
 }
 .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+.doc-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(24, 144, 255, 0.08);
+  border: 1px solid rgba(24, 144, 255, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+  max-width: 320px;
+  transition: background 0.2s;
+}
+.doc-card:hover { background: rgba(24, 144, 255, 0.16); }
+.doc-card-icon { font-size: 16px; }
+.doc-card-title {
+  flex: 1;
+  font-size: 13px;
+  color: #096dd9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-card-btn {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid #1890ff;
+  color: #1890ff;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.doc-card-btn:hover { background: #e6f7ff; }
 </style>

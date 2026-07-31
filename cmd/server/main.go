@@ -59,7 +59,6 @@ func main() {
 	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
 	r.HandleFunc("/api/devices", httpHandler.PublicListDevices).Methods("GET")
 	r.HandleFunc("/api/devices/{id}", httpHandler.PublicDeleteDevice).Methods("DELETE")
-
 	// REST API (authenticated)
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(httpHandler.AuthMiddleware)
@@ -139,7 +138,7 @@ func main() {
 	r.HandleFunc("/api/devices/{id}/model", httpHandler.SetDeviceModel).Methods("PUT")
 	r.HandleFunc("/admin/proxy/dashboard", httpHandler.ProxyDashboard).Methods("GET")
 	r.HandleFunc("/api/devices/{id}/activity", httpHandler.GetDeviceActivity).Methods("GET")
-	r.HandleFunc("/api/devices/activity", httpHandler.PostDeviceActivity).Methods("POST")
+	api.HandleFunc("/devices/activity", httpHandler.PostDeviceActivity).Methods("POST")
 
 	r.HandleFunc("/api/skills", httpHandler.ListSkills).Methods("GET")
 	r.HandleFunc("/api/capabilities", httpHandler.ListCapabilities).Methods("GET")

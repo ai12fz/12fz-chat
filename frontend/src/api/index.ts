@@ -82,3 +82,19 @@ export async function sendMessage(groupId: number, content: string) {
   const { data } = await api.post('/messages', { group_id: groupId, content })
   return data
 }
+// ── Documents ──
+
+export async function listDocuments(limit = 50) {
+  const { data } = await api.get('/documents', { params: { limit } })
+  return data
+}
+
+export async function getDocQuota(merchantId: string) {
+  const { data } = await api.get('/admin/doc-quota', { params: { merchant_id: merchantId } })
+  return data
+}
+
+export async function setDocQuota(merchantId: string, docLimit: number) {
+  const { data } = await api.put('/admin/doc-quota', { merchant_id: merchantId, doc_limit: docLimit })
+  return data
+}

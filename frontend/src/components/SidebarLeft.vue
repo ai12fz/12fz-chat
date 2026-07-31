@@ -11,6 +11,7 @@
     <div class="tab-bar">
       <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
       <div class="tab" :class="{ active: activeTab === 'friends' }" @click="activeTab = 'friends'">好友</div>
+      <div class="tab" :class="{ active: activeTab === 'docs' }" @click="activeTab = 'docs'; loadDocs()">文档</div>
     </div>
 
     <div class="tab-content" v-show="activeTab === 'msg'">
@@ -63,6 +64,26 @@
       </div>
     </div>
 
+    <div class="tab-content" v-show="activeTab === 'docs'">
+      <div class="doc-list-header">
+        <span class="doc-list-title">📄 最近文档</span>
+        <button class="refresh-btn" @click="loadDocs" title="刷新">⟳</button>
+      </div>
+      <nav class="session-list">
+        <div v-for="d in docs" :key="d.id" class="session-item" @click="downloadDoc(d.id)">
+          <span class="avatar sm" style="background: #fa8c16">📄</span>
+          <div class="session-info">
+            <div class="session-top">
+              <span class="session-name doc-name">{{ d.title }}</span>
+            </div>
+            <span class="session-msg">{{ formatSize(d.size) }} · {{ formatTime(d.created_at) }}</span>
+          </div>
+          <button class="doc-dl-btn" @click.stop="downloadDoc(d.id)">下载</button>
+        </div>
+        <div v-if="docs.length === 0" class="empty-hint">暂无文档</div>
+      </nav>
+    </div>
+
     <div v-if="showProfile" class="profile-overlay" @click.self="showProfile = false">
       <div class="profile-card">
         <div class="profile-avatar" :style="{ background: avatarColor({name: displayName}) }">{{ displayName[0] }}</div>
@@ -87,7 +108,7 @@ import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
-import { getFriends } from '../api'
+import { getFriends, listDocuments } from '../api'
 import AddFriendDialog from './AddFriendDialog.vue'
 
 const router = useRouter()
@@ -95,6 +116,7 @@ const auth = useAuthStore()
 const chat = useChatStore()
 const search = ref('')
 const activeTab = ref('msg')
+const docs = ref<any[]>([])
 
 const friends = ref<any[]>([])
 const nonAgentFriends = computed(() => friends.value)
@@ -139,6 +161,50 @@ function avatarColor(s: { name: string }) {
   let hash = 0
   for (let i = 0; i < s.name.length; i++) hash = s.name.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
+}
+
+async function loadDocs() {
+  try {
+    const res = await listDocuments(50)
+    docs.value = Array.isArray(res) ? res : []
+  } catch (e) {
+    docs.value = []
+  }
+}
+
+async function downloadDoc(id: string) {
+  const token = localStorage.getItem('token') || ''
+  try {
+    const res = await fetch('/api/documents/' + id + '/download', {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+    if (!res.ok) { alert('下载失败: HTTP ' + res.status); return }
+    const blob = await res.blob()
+    let filename = 'doc-' + id
+    const cd = res.headers.get('Content-Disposition') || ''
+    const m = cd.match(/filename\*=UTF-8''([^;]+)/)
+    if (m) filename = decodeURIComponent(m[1])
+    else { const m2 = cd.match(/filename="([^"]+)"/); if (m2) filename = m2[1] }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = filename
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  } catch (e) { alert('下载失败: ' + e) }
+}
+
+function formatSize(bytes: number) {
+  if (!bytes && bytes !== 0) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+function formatTime(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' +
+    d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
 function goAdmin() { router.push('/admin/agents') }
@@ -371,4 +437,39 @@ loadFriends()
   border: 1px solid #d9d9d9; border-radius: 4px; cursor: pointer;
 }
 .profile-msg { font-size: 12px; color: #52c41a; margin-top: 4px; }
+
+.doc-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #666;
+}
+.doc-list-title { font-weight: 600; }
+.refresh-btn {
+  border: none;
+  background: none;
+  font-size: 15px;
+  cursor: pointer;
+  color: #1890ff;
+}
+.doc-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-dl-btn {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid #1890ff;
+  color: #1890ff;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.doc-dl-btn:hover { background: #e6f7ff; }
 </style>
