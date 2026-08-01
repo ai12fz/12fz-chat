@@ -57,6 +57,7 @@ func main() {
 	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
 	
 	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
+	r.HandleFunc("/api/sso/exchange", httpHandler.SsoExchange).Methods("POST")
 	r.HandleFunc("/api/devices", httpHandler.PublicListDevices).Methods("GET")
 	r.HandleFunc("/api/devices/{id}", httpHandler.PublicDeleteDevice).Methods("DELETE")
 	// REST API (authenticated)
