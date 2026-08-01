@@ -416,9 +416,9 @@ func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, err
 	rows, err := d.pool.Query(ctx,
 		`SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at, COALESCE(a.display_name, d.name, f.friend_id) as name,
 		CASE
-			WHEN d.id IS NOT NULL THEN d.status = 'online'
-			WHEN a.id IS NOT NULL THEN a.heartbeat_at > NOW() - INTERVAL '3 minutes'
-			ELSE false
+			WHEN d.id IS NOT NULL THEN COALESCE(d.status, 'offline') = 'online'
+			WHEN a.id IS NOT NULL THEN COALESCE(a.heartbeat_at > NOW() - INTERVAL '3 minutes', false)
+			ELSE true
 		END as online
 		FROM chat.friends f LEFT JOIN chat.agents a ON f.friend_id = a.bot_id LEFT JOIN chat.devices d ON f.friend_id = d.id WHERE f.user_id = $1`,
 		userID)
