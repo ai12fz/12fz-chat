@@ -440,7 +440,7 @@ func (h *HTTPHandler) CreateSkill(w http.ResponseWriter, r *http.Request) {
 
 // UpdateSkill updates a skill
 func (h *HTTPHandler) UpdateSkill(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+	name := mux.Vars(r)["name"]
 	var s map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&s)
 	if err := h.db.UpdateSkill(r.Context(), name, s); err != nil {
@@ -452,7 +452,7 @@ func (h *HTTPHandler) UpdateSkill(w http.ResponseWriter, r *http.Request) {
 
 // DeleteSkill deletes a skill
 func (h *HTTPHandler) DeleteSkill(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+	name := mux.Vars(r)["name"]
 	if err := h.db.DeleteSkill(r.Context(), name); err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -1113,7 +1113,7 @@ func (h *HTTPHandler) PostDeviceActivity(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *HTTPHandler) GetDeviceActivity(w http.ResponseWriter, r *http.Request) {
-	deviceID := r.PathValue("id")
+	deviceID := mux.Vars(r)["id"]
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" { fmt.Sscanf(l, "%d", &limit) }
 	activity, _ := h.db.GetDeviceActivity(r.Context(), deviceID, limit)
@@ -1122,7 +1122,7 @@ func (h *HTTPHandler) GetDeviceActivity(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *HTTPHandler) ToggleDeviceSkills(w http.ResponseWriter, r *http.Request) {
-	deviceID := r.PathValue("id")
+	deviceID := mux.Vars(r)["id"]
 	if err := h.db.ToggleDeviceSkills(r.Context(), deviceID); err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -1131,7 +1131,7 @@ func (h *HTTPHandler) ToggleDeviceSkills(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *HTTPHandler) ToggleDeviceSoftware(w http.ResponseWriter, r *http.Request) {
-	deviceID := r.PathValue("id")
+	deviceID := mux.Vars(r)["id"]
 	if err := h.db.ToggleDeviceSoftware(r.Context(), deviceID); err != nil {
 		jsonError(w, err.Error(), 500)
 		return
