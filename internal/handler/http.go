@@ -856,16 +856,14 @@ func (h *HTTPHandler) proxyRequest(w http.ResponseWriter, r *http.Request, targe
 	}
 	json.Unmarshal(body, &reqBody)
 
-	// Route to model endpoint from DB
-	models, _ := h.db.ProxyListModels(r.Context())
+	// Route to model endpoint from DB (real key, not masked)
 	endpoint := target
 	apiKey := ""
-	for _, m := range models {
-		if m["name"] == reqBody.Model && m["status"] == "active" {
-			if ep, ok := m["endpoint"].(string); ok && ep != "" { endpoint = ep }
-			if k, ok := m["api_key"].(string); ok { apiKey = k }
-			break
+	if ep, k, err := h.db.ProxyGetModelKey(r.Context(), reqBody.Model); err == nil {
+		if ep != "" {
+			endpoint = ep
 		}
+		apiKey = k
 	}
 	// === BILLING: extract org_id + key_id from client API key ===
 	orgID := "00000000-0000-0000-0000-000000000000" // fallback
@@ -1085,12 +1083,18 @@ func (h *HTTPHandler) resolveOrgFromToken(token string) (string, error) {
 		Code int `json:"code"`
 		Data struct {
 			UserInfo struct {
-				OrgID string `json:"org_id"`
+				OrgID    string `json:"org_id"`
+				Username string `json:"username"`
 			} `json:"userInfo"`
 		} `json:"data"`
 	}
 	json.Unmarshal(body, &upstream)
 	if upstream.Data.UserInfo.OrgID == "" {
+		// Super admin has no org bound in the zhongtai SSO — fall back to the
+		// master org where all system devices live.
+		if upstream.Data.UserInfo.Username == "admin" {
+			return "00000000-0000-0000-0000-000000000000", nil
+		}
 		return "", fmt.Errorf("org not found")
 	}
 	return upstream.Data.UserInfo.OrgID, nil

@@ -80,6 +80,18 @@ func maskSecret(s string) string {
 	return s[:4] + "****" + s[len(s)-4:]
 }
 
+// ProxyGetModelKey returns the REAL endpoint + api_key for a model (no masking).
+// Used by proxyRequest for upstream forwarding — ProxyListModels masks keys for
+// admin UI display, which must never be forwarded upstream.
+func (d *DB) ProxyGetModelKey(ctx context.Context, name string) (string, string, error) {
+	var endpoint, apiKey string
+	err := d.pool.QueryRow(ctx,
+		`SELECT endpoint, api_key FROM chat.proxy_models WHERE name=$1 AND status='active' ORDER BY priority DESC, id LIMIT 1`,
+		name).Scan(&endpoint, &apiKey)
+	return endpoint, apiKey, err
+}
+
+// ProxyCreateModel inserts a new model row.
 func (d *DB) ProxyCreateModel(ctx context.Context, m map[string]interface{}) error {
 	_, err := d.pool.Exec(ctx, `INSERT INTO chat.proxy_models (name,display_name,provider,endpoint,api_key,status,priority,max_rpm)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
