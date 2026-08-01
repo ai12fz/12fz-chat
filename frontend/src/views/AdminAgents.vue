@@ -7,14 +7,20 @@
         <router-link to="/admin/proxy">中转站</router-link>
         <router-link to="/admin/agents">Agent管理</router-link>
       </div>
-      <button class="btn-primary" @click="openAgent()">+ 新建 Agent</button>
+      <div class="header-actions" style="display:flex;gap:8px;align-items:center">
+        <select v-model="filterDevice" @change="loadAgents" style="padding:5px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px">
+          <option value="">全部设备</option>
+          <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+        <button class="btn-primary" @click="openAgent()">+ 新建 Agent</button>
+      </div>
     </div>
 
     <table v-if="agents.length">
       <thead><tr><th>设备</th><th>Bot ID</th><th>显示名</th><th>类型</th><th>模型</th><th>状态</th><th>群聊</th><th>操作</th></tr></thead>
       <tbody>
         <tr v-for="a in agents" :key="a.bot_id">
-          <td>{{ a.swarm_name || '—' }}</td>
+          <td>{{ deviceName(a.device_id) }}</td>
           <td>{{ a.bot_id }}</td><td>{{ a.display_name }}</td>
           <td><span :class="'type-tag type-' + (a.agent_type || 'api')">{{ a.agent_type === 'hermes' ? 'Hermes' : 'API' }}</span></td>
           <td>
@@ -48,6 +54,12 @@
         <!-- Quick Config -->
         <div v-show="agentTab==='quick'">
           <div class="form-group"><label>显示名称 *</label><input v-model="editAgent.display_name" placeholder="如：销售助手" /></div>
+          <div class="form-group"><label>归属设备</label>
+            <select v-model="editAgent.device_id">
+              <option value="">— 不绑定设备（API 独立 Agent）—</option>
+              <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
+            </select>
+          </div>
           <div class="form-group"><label>类型 *</label>
             <select v-model="editAgent.agent_type">
               <option value="api">API — 中转站标准 Agent（走模型计费）</option>
@@ -212,11 +224,24 @@ async function loadProxyModels() {
 const agentTab = ref('quick')
 const installCmd = ref('')
 const createdToken = ref('')
+const devices = ref<any[]>([])
+const filterDevice = ref('')
+
+function deviceName(id?: string) {
+  if (!id) return '—'
+  const d = devices.value.find(x => x.id === id)
+  return d ? d.name : id
+}
+
+async function loadDevices() {
+  try { const r = await request('/api/devices'); devices.value = (r && r.devices) || [] } catch {}
+}
 
 const editAgent = ref<any>({ bot_id: '', display_name: '', model: 'deepseek-v4-flash', system_prompt: '', capabilities: [], status: 'active', api_key: '', api_url: 'https://ai.12fz.com/v1', agent_type: 'api' })
 
 onMounted(async () => {
   await loadProxyModels()
+  await loadDevices()
   await loadAgents()
   try { const { data } = await apiGet('/groups/my'); groups.value = data || [] } catch {}
 })
@@ -229,8 +254,10 @@ async function changeModel(agent: any, newModel: string) {
 }
 
 async function loadAgents() {
-  try { const data = await apiGet('/agents'); agents.value = data || []
-} catch(e: any) { error.value = e.message || '加载失败' }
+  try {
+    const q = filterDevice.value ? '?device_id=' + encodeURIComponent(filterDevice.value) : ''
+    const data = await apiGet('/agents' + q); agents.value = data || []
+  } catch(e: any) { error.value = e.message || '加载失败' }
 }
 
 const categories = ['办公','日常','销售','生产','编程','旅游','财务','策划运营','客服','农业','科技','教育','医疗','法律','设计','营销','物流','招聘','餐饮','房产','税务']
@@ -257,7 +284,8 @@ async function saveQuickAgent() {
     status: 'active',
     api_key: a.api_key || '',
     api_url: a.api_url || 'https://ai.12fz.com/v1',
-    agent_type: a.agent_type || 'api'
+    agent_type: a.agent_type || 'api',
+    device_id: a.device_id || ''
   }
   try {
     const res = await request('/api/agents', { method: 'POST', body: JSON.stringify(body) })
