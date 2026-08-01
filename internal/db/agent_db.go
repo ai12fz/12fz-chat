@@ -36,7 +36,7 @@ type Agent struct {
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
-const agentCols = "id, bot_id, display_name, device_id, model, COALESCE(model_provider,''), system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), COALESCE(swarm_name,''), allow_install_skills, allow_install_software, COALESCE(heartbeat_at, TIMESTAMPTZ 'epoch'), created_at, updated_at"
+const agentCols = "id, bot_id, display_name, COALESCE(device_id,''), model, COALESCE(model_provider,''), system_prompt, category, capabilities, status, api_key, api_url, merchant_id, COALESCE(agent_type,'api'), COALESCE(token,''), COALESCE(swarm_name,''), allow_install_skills, allow_install_software, COALESCE(heartbeat_at, TIMESTAMPTZ 'epoch'), created_at, updated_at"
 
 func (d *DB) ListAgents(ctx context.Context, merchantID ...string) ([]Agent, error) {
 	query := "SELECT " + agentCols + " FROM chat.agents"
