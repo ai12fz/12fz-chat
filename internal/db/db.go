@@ -82,6 +82,26 @@ func (d *DB) GetOrgID(ctx context.Context, userID int64) (string, error) {
 	return orgID, err
 }
 
+// ListOrgStaff returns all users of the merchant org (non-owner staff), excluding the caller.
+func (d *DB) ListOrgStaff(ctx context.Context, orgID string, excludeUserID int64) ([]OrgUser, error) {
+	rows, err := d.platformPool.Query(ctx,
+		"SELECT user_id, nickname, phone, COALESCE(email, ''), status FROM org_user WHERE org_id = $1 AND user_id <> $2 ORDER BY user_id",
+		orgID, excludeUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var staff []OrgUser
+	for rows.Next() {
+		var u OrgUser
+		if err := rows.Scan(&u.UserID, &u.Nickname, &u.Phone, &u.Email, &u.Status); err != nil {
+			return nil, err
+		}
+		staff = append(staff, u)
+	}
+	return staff, nil
+}
+
 func (d *DB) GetOrgUserForLogin(ctx context.Context, account, password string) (*OrgUser, error) {
 	var u OrgUser
 	err := d.platformPool.QueryRow(ctx,

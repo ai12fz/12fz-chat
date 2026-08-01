@@ -53,6 +53,16 @@ export async function addFriend(userId: string, friendId: string) {
   return data
 }
 
+export async function listOrgStaff() {
+  const { data } = await api.get('/org/staff')
+  return data
+}
+
+export async function grantFriend(friendId: string, userIds: string[]) {
+  const { data } = await api.post(`/friends/${friendId}/grant`, { user_ids: userIds })
+  return data
+}
+
 export async function getFriendMessages(userId: string, otherId: string) {
   const token = localStorage.getItem('token') || ''
   const res = await fetch('/api/friend-messages?with=' + otherId, {

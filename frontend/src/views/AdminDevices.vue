@@ -5,7 +5,6 @@
       <div class="admin-nav">
         <router-link to="/admin/devices">设备管理</router-link>
         <router-link to="/admin/proxy">中转站</router-link>
-        <router-link to="/admin/agents">Agent管理</router-link>
       </div>
       <div class="header-actions">
         <button class="btn-primary" @click="genCode">+ 生成注册码</button>

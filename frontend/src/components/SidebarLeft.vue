@@ -6,7 +6,6 @@
         <span class="name">{{ displayName }}</span>
       </div>
       <button class="logout-btn" @click="handleLogout" title="退出登录">退出</button>
-      <button class="admin-btn" @click="goAdmin" title="Agent管理">⚙ 管理</button>
     </div>
     <div class="tab-bar">
       <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
@@ -40,8 +39,13 @@
 
 
 <div class="tab-content" v-show="activeTab === 'friends'">
+      <div class="friend-tabs">
+        <div class="ftab" :class="{ active: friendTab === 'human' }" @click="friendTab = 'human'">👤 好友</div>
+        <div class="ftab" :class="{ active: friendTab === 'device' }" @click="friendTab = 'device'">🖥 主机</div>
+        <div class="ftab" :class="{ active: friendTab === 'agent' }" @click="friendTab = 'agent'">🤖 Agent</div>
+      </div>
       <nav class="session-list">
-        <div v-for="f in friends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.friend_id, f.user_type)">
+        <div v-for="f in filteredFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.name || f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.name || f.friend_id}) }">{{ (f.name || f.friend_id)[0] }}</span>
           <div class="session-info">
             <div class="session-top">
@@ -53,14 +57,34 @@
             </div>
             <span class="session-msg">{{ f.status || '暂无消息' }}</span>
           </div>
+          <button v-if="f.user_type === 'device' || f.user_type === 'agent'" class="grant-btn" title="授权给员工" @click.stop="openGrant(f)">授权</button>
         </div>
-        <div v-if="friends.length === 0" class="empty-hint">暂无好友</div>
+        <div v-if="filteredFriends.length === 0" class="empty-hint">{{ friendTab === 'human' ? '暂无好友' : friendTab === 'device' ? '暂无主机' : '暂无Agent' }}</div>
       </nav>
-      <div class="add-friend-bar">
+      <div class="add-friend-bar" v-if="friendTab === 'human'">
         <div class="session-item" @click="showAddFriend = true">
           <span class="avatar sm" style="background: #52c41a">+</span>
           <div class="session-info"><span class="session-name">添加好友</span></div>
         </div>
+      </div>
+    </div>
+
+    <div v-if="grant.show" class="profile-overlay" @click.self="grant.show = false">
+      <div class="profile-card grant-card">
+        <h3>授权给员工</h3>
+        <p class="grant-target">目标: {{ grant.friend?.name || grant.friend?.friend_id }}</p>
+        <div class="grant-list">
+          <label v-for="s in staff" :key="s.user_id" class="grant-item">
+            <input type="checkbox" :value="String(s.user_id)" v-model="grant.checked" />
+            <span>{{ s.nickname || s.phone || s.user_id }} <em v-if="s.phone">({{ s.phone }})</em></span>
+          </label>
+          <div v-if="staff.length === 0" class="empty-hint">暂无员工可授权</div>
+        </div>
+        <div class="grant-actions">
+          <button class="save-btn" :disabled="grant.loading" @click="doGrant">{{ grant.loading ? '提交中...' : '确认授权' }}</button>
+          <button class="close-btn" @click="grant.show = false">取消</button>
+        </div>
+        <p v-if="grant.msg" class="profile-msg">{{ grant.msg }}</p>
       </div>
     </div>
 
@@ -129,13 +153,11 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
-import { getFriends, listDocuments } from '../api'
+import { getFriends, listDocuments, listOrgStaff, grantFriend } from '../api'
 import AddFriendDialog from './AddFriendDialog.vue'
 
-const router = useRouter()
 const auth = useAuthStore()
 const chat = useChatStore()
 const search = ref('')
@@ -143,11 +165,49 @@ const activeTab = ref('msg')
 const docs = ref<any[]>([])
 
 const friends = ref<any[]>([])
+const friendTab = ref<'human' | 'device' | 'agent'>('human')
+const filteredFriends = computed(() => {
+  return friends.value.filter((f: any) => {
+    const t = f.user_type || 'human'
+    if (friendTab.value === 'human') return t === 'human' || t === 'api'
+    return t === friendTab.value
+  })
+})
 const nonAgentFriends = computed(() => friends.value)
 const showAddFriend = ref(false)
 const showProfile = ref(false)
 const newNickname = ref('')
 const profileMsg = ref('')
+const staff = ref<any[]>([])
+const grant = ref({ show: false, friend: null as any, checked: [] as string[], loading: false, msg: '' })
+
+async function openGrant(f: any) {
+  grant.value = { show: true, friend: f, checked: [], loading: false, msg: '' }
+  try {
+    const res = await listOrgStaff()
+    staff.value = Array.isArray(res) ? res : []
+  } catch (e) {
+    staff.value = []
+    grant.value.msg = '加载员工列表失败'
+  }
+}
+
+async function doGrant() {
+  if (!grant.value.friend || grant.value.checked.length === 0) {
+    grant.value.msg = '请选择员工'
+    return
+  }
+  grant.value.loading = true
+  try {
+    await grantFriend(grant.value.friend.friend_id, grant.value.checked)
+    grant.value.msg = '授权成功'
+    setTimeout(() => { grant.value.show = false }, 800)
+  } catch (e: any) {
+    grant.value.msg = '授权失败: ' + (e?.response?.data?.error || e?.message || e)
+  } finally {
+    grant.value.loading = false
+  }
+}
 
 // ── Document preview ──
 const preview = ref({ show: false, doc: null as any, url: '', kind: '', text: '', loading: false, error: '' })
@@ -270,11 +330,20 @@ function formatTime(iso: string) {
     d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
-function goAdmin() { router.push('/admin/agents') }
-
 async function loadFriends() {
+  // Resolve the numeric uid first. The old code read auth.user synchronously, but
+  // whoami runs async in ChatView's onMounted AFTER this component's setup, so the
+  // fallback {username:'用户'} won the race and we queried /friends/用户 (empty).
+  let userId = ''
   const token = localStorage.getItem('token') || ''
-  const userId = token.startsWith('session-') ? token.slice(8) : auth.user?.bot_id || auth.user?.username
+  if (token.startsWith('session-')) {
+    userId = token.slice(8)
+  } else {
+    if (!auth.userInfo && token) {
+      try { await auth.fetchWhoAmI() } catch (e) { /* keep fallback */ }
+    }
+    userId = auth.userInfo?.user_id || auth.user?.bot_id || auth.user?.username || ''
+  }
   if (!userId) return
   try {
     const res = await getFriends(userId)
@@ -469,6 +538,63 @@ loadFriends()
 }
 
 .add-friend-bar { border-top: 1px solid #f0f0f0; margin-top: auto; }
+
+.friend-tabs {
+  display: flex;
+  border-bottom: 1px solid #e8e8e8;
+  background: #fafafa;
+}
+.ftab {
+  flex: 1;
+  text-align: center;
+  padding: 7px 0;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  user-select: none;
+}
+.ftab.active {
+  color: #1890ff;
+  font-weight: 600;
+  border-bottom-color: #1890ff;
+  background: #fff;
+}
+.grant-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #1890ff;
+  border-radius: 10px;
+  background: #fff;
+  color: #1890ff;
+  cursor: pointer;
+}
+.grant-btn:hover { background: #e6f7ff; }
+
+.grant-card { width: 320px; text-align: left; }
+.grant-card h3 { font-size: 15px; margin: 0 0 8px; }
+.grant-target { font-size: 12px; color: #888; margin: 0 0 12px; }
+.grant-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 12px;
+}
+.grant-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.grant-item em { font-style: normal; color: #999; font-size: 12px; }
+.grant-actions { display: flex; gap: 8px; }
+.grant-actions .save-btn { margin-top: 0; }
+.grant-actions .close-btn { margin-top: 0; }
 
 .profile-overlay {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;

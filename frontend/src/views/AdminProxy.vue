@@ -5,7 +5,6 @@
       <div class="admin-nav">
         <router-link to="/admin/devices">设备管理</router-link>
         <router-link to="/admin/proxy">中转站</router-link>
-        <router-link to="/admin/agents">Agent管理</router-link>
       </div>
       <div class="tabs">
         <button v-for="t in tabs" :key="t.id" :class="{ active: tab === t.id }" @click="tab = t.id">{{ t.name }}</button>

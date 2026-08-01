@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="dialog-overlay" @click.self="close">
+  <div class="dialog-overlay" @click.self="close">
     <div class="dialog-card">
       <h3>添加好友</h3>
       <label style="display:block;margin-bottom:4px;font-size:13px;color:#666">请输入好友的用户ID</label>
@@ -17,22 +17,28 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { addFriend } from "../api";
+import { useAuthStore } from "../stores/auth";
 
 const props = defineProps<{ visible: boolean }>();
 const emit = defineEmits(["close", "added"]);
 const friendId = ref("");
 const error = ref("");
 const tip = ref("");
+const auth = useAuthStore();
 
 async function submit() {
   error.value = "";
   tip.value = "";
   const fid = friendId.value.trim();
   if (!fid) return;
-  const token = localStorage.getItem("token") || "";
-  const myId = token.startsWith("session-") ? token.slice(8) : token;
+  // Ensure whoami resolved so we have the real numeric uid (not the JWT itself).
+  if (!auth.userInfo && auth.token) {
+    try { await auth.fetchWhoAmI() } catch (e) { /* ignore */ }
+  }
+  const myId = auth.userInfo?.user_id || auth.user?.bot_id || auth.user?.username || "";
+  if (!myId) { error.value = "无法获取当前用户ID"; return; }
   try {
-    await addFriend(myId, fid);
+    await addFriend(String(myId), fid);
     emit("added", fid);
     friendId.value = "";
     tip.value = "请求已发送，等待对方同意";

@@ -90,6 +90,8 @@ func main() {
 	api.HandleFunc("/friends/{id}/category", httpHandler.UpdateFriendCategory).Methods("PATCH")
 	api.HandleFunc("/friends", httpHandler.AddFriend).Methods("POST")
 	api.HandleFunc("/friends/{user_id}", httpHandler.GetFriends).Methods("GET")
+	api.HandleFunc("/friends/{id}/grant", httpHandler.GrantFriend).Methods("POST")
+	api.HandleFunc("/org/staff", httpHandler.ListOrgStaff).Methods("GET")
 	api.HandleFunc("/agent-status", httpHandler.GetAgentStatus).Methods("GET")
 
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")

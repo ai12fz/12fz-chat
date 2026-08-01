@@ -348,6 +348,65 @@ func (h *HTTPHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, friends, 200)
 }
 
+// ListOrgStaff returns staff of the caller's merchant org (excluding the caller).
+// GET /api/org/staff
+func (h *HTTPHandler) ListOrgStaff(w http.ResponseWriter, r *http.Request) {
+	botID := getBotID(r)
+	uid, err := strconv.ParseInt(botID, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid bot id", 400)
+		return
+	}
+	orgID, err := h.db.GetOrgID(r.Context(), uid)
+	if err != nil || orgID == "" {
+		jsonError(w, "org not found", 404)
+		return
+	}
+	staff, err := h.db.ListOrgStaff(r.Context(), orgID, uid)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, staff, 200)
+}
+
+// GrantFriend authorizes a device/agent friend to one or more staff users.
+// POST /api/friends/{id}/grant  body: {"user_ids": [..]}
+// Authorization is stored as extra rows in chat.friends (one per staff),
+// so a single host/agent can be granted to multiple employees.
+func (h *HTTPHandler) GrantFriend(w http.ResponseWriter, r *http.Request) {
+	friendID := mux.Vars(r)["id"]
+	var req struct {
+		UserIDs []string `json:"user_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "bad request", 400)
+		return
+	}
+	if len(req.UserIDs) == 0 {
+		jsonError(w, "user_ids required", 400)
+		return
+	}
+	// Find the friend's user_type from the caller's own row so grants copy the same type.
+	userType := "human"
+	friends, err := h.db.GetFriends(r.Context(), getBotID(r))
+	if err == nil {
+		for _, f := range friends {
+			if f.FriendID == friendID {
+				userType = f.UserType
+				break
+			}
+		}
+	}
+	for _, uid := range req.UserIDs {
+		if err := h.db.AddFriend(r.Context(), uid, friendID, userType); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
+}
+
 
 
 func (h *HTTPHandler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
