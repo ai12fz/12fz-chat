@@ -594,12 +594,36 @@ func (h *HTTPHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
 	mid := r.Header.Get("X-Merchant-ID")
-	agents, err := h.db.ListAgents(r.Context(), mid)
+	deviceID := r.URL.Query().Get("device_id")
+	var (
+		agents []db.Agent
+		err    error
+	)
+	if deviceID != "" {
+		agents, err = h.db.ListAgentsByDevice(r.Context(), deviceID)
+	} else {
+		agents, err = h.db.ListAgents(r.Context(), mid)
+	}
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
 	}
 	jsonResp(w, agents, 200)
+}
+
+// AgentHeartbeat updates agent heartbeat_at + status (called by device bridge for each running agent)
+func (h *HTTPHandler) AgentHeartbeat(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	botID := vars["bot_id"]
+	if botID == "" {
+		jsonError(w, "bot_id required", 400)
+		return
+	}
+	if err := h.db.TouchAgentHeartbeat(r.Context(), botID); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "ok"}, 200)
 }
 
 func (h *HTTPHandler) GetAgent(w http.ResponseWriter, r *http.Request) {

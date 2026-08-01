@@ -78,6 +78,7 @@ func main() {
 	api.HandleFunc("/agents/{bot_id}", httpHandler.DeleteAgent).Methods("DELETE")
 	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.AgentGroups).Methods("GET")
 	api.HandleFunc("/agents/{bot_id}/groups", httpHandler.SetAgentGroups).Methods("PUT")
+	api.HandleFunc("/agents/{bot_id}/heartbeat", httpHandler.AgentHeartbeat).Methods("POST")
 
 
 	
