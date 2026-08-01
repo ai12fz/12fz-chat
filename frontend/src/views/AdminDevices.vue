@@ -418,6 +418,8 @@ function winCmd(code: string) {
 .btn-outline { background: #fff; border: 1px solid #ddd; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
 .btn-danger { background: #ef4444; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 .btn-sm { background: #f0f0f0; border: 1px solid #ddd; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.btn-primary.btn-sm { background: #6366f1; border: none; color: #fff; }
+.btn-danger.btn-sm { background: #ef4444; border: none; color: #fff; }
 .key-card { background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
 .key-card h3 { margin-top: 0; }
 .table { width: 100%; border-collapse: collapse; }
