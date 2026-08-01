@@ -7,6 +7,24 @@ import (
 )
 
 func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
+	// Local JWT (signed by this service via /api/sso/exchange or bot tokens):
+	// resolve bot_id locally instead of proxying to marketplace, which does
+	// not recognize chat-native JWTs and would fall back to anonymous admin.
+	if token := ExtractTokenFromHeader(r); token != "" {
+		if botID, err := h.authHandler.ValidateToken(token); err == nil {
+			jsonResp(w, map[string]interface{}{
+				"user_id":  botID,
+				"bot_id":   botID,
+				"nickname": botID,
+				"username": botID,
+				"org_id":   "",
+			}, 200)
+			return
+		}
+	}
+
+	// Fallback: proxy to marketplace (session-xxx tokens and other upstream
+	// credentials that only go.12fz.com can validate).
 	req, err := http.NewRequest("GET", "https://go.12fz.com/api/sys/home", nil)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
