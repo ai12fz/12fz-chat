@@ -29,6 +29,9 @@ func main() {
 
 	// Auto migrate
 	ctx := context.Background()
+	if err := database.EnsureAnalyticsTable(ctx); err != nil {
+		log.Printf("[chat] analytics table: %v", err)
+	}
 	if err := database.AutoMigrate(ctx); err != nil {
 		log.Fatalf("[chat] migrate: %v", err)
 	}
@@ -57,6 +60,9 @@ func main() {
 	r.HandleFunc("/api/connections", httpHandler.ListConnections).Methods("GET")
 	
 	r.HandleFunc("/api/whoami", httpHandler.WhoAmI).Methods("GET")
+	r.HandleFunc("/api/v1/track", httpHandler.TrackEvent).Methods("POST")
+	r.HandleFunc("/api/v1/analytics/overview", httpHandler.AnalyticsOverview).Methods("GET")
+	r.HandleFunc("/analytics", httpHandler.AnalyticsPage).Methods("GET")
 	r.HandleFunc("/api/sso/exchange", httpHandler.SsoExchange).Methods("POST")
 	r.HandleFunc("/api/devices", httpHandler.PublicListDevices).Methods("GET")
 	r.HandleFunc("/api/devices/{id}", httpHandler.PublicDeleteDevice).Methods("DELETE")
