@@ -97,7 +97,7 @@ export function useWebSocket() {
 
   function handleEvent(data: { event: string; bot_id: string }) {
     if (data.event === 'user_online' || data.event === 'user_offline') {
-      console.log(`[ws] ${data.bot_id} ${data.event}`)
+      store.setOnline(data.bot_id, data.event === 'user_online')
     }
   }
 

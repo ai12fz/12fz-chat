@@ -70,6 +70,12 @@ export const useChatStore = defineStore('chat', () => {
   }, 5000)
 
   const agentStatuses = ref<Record<string, any[]>>({})  // deviceId -> status entries
+  // Live online/offline map driven by WS user_online/user_offline events (botId -> bool)
+  const onlineMap = ref<Record<string, boolean>>({})
+
+  function setOnline(botId: string, online: boolean) {
+    onlineMap.value[botId] = online
+  }
 
   function addAgentStatus(from: string, data: any) {
     // {p:"d"} = done/clear

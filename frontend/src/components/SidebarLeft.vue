@@ -40,7 +40,7 @@
 
 <div class="tab-content" v-show="activeTab === 'friends'">
       <nav class="session-list">
-        <div v-for="f in friends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id, 'offline-item': f.online === false }" @click="openFriendChat(f.friend_id, f.name || f.friend_id, f.user_type)">
+        <div v-for="f in displayFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id, 'offline-item': f.online === false }" @click="openFriendChat(f.friend_id, f.name || f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.name || f.friend_id}) }">{{ (f.name || f.friend_id)[0] }}</span>
           <div class="session-info">
             <div class="session-top">
@@ -55,7 +55,7 @@
           </div>
           <button v-if="f.user_type === 'device' || f.user_type === 'agent'" class="grant-btn" title="授权给员工" @click.stop="openGrant(f)">授权</button>
         </div>
-        <div v-if="friends.length === 0" class="empty-hint">暂无好友</div>
+        <div v-if="displayFriends.length === 0" class="empty-hint">暂无好友</div>
       </nav>
       <div class="add-friend-bar">
         <div class="session-item" @click="showAddFriend = true">
@@ -161,6 +161,14 @@ const activeTab = ref('msg')
 const docs = ref<any[]>([])
 
 const friends = ref<any[]>([])
+// 在线状态合并:优先 WS 实时 onlineMap(设备/agent 上下线即时变色),后端快照兜底;human 恒在线
+const displayFriends = computed(() =>
+  friends.value.map((f: any) => {
+    if (f.user_type === 'human' || f.user_type === 'api') return { ...f, online: true }
+    const live = chat.onlineMap[f.friend_id]
+    return live === undefined ? f : { ...f, online: live }
+  })
+)
 const showAddFriend = ref(false)
 const showProfile = ref(false)
 const newNickname = ref('')
