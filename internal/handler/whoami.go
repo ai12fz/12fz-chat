@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 )
 
 func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
@@ -12,11 +14,17 @@ func (h *HTTPHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 	// not recognize chat-native JWTs and would fall back to anonymous admin.
 	if token := ExtractTokenFromHeader(r); token != "" {
 		if botID, err := h.authHandler.ValidateToken(token); err == nil {
+			nickname := botID
+			if id, convErr := strconv.ParseInt(botID, 10, 64); convErr == nil {
+				if u, uErr := h.db.GetOrgUserByID(context.Background(), id); uErr == nil && u.Nickname != "" {
+					nickname = u.Nickname
+				}
+			}
 			jsonResp(w, map[string]interface{}{
 				"user_id":  botID,
 				"bot_id":   botID,
-				"nickname": botID,
-				"username": botID,
+				"nickname": nickname,
+				"username": nickname,
 				"org_id":   "",
 			}, 200)
 			return
