@@ -88,10 +88,14 @@ cp "$(dirname "$0")/hermes-bridge.py" "$BRIDGE_DIR/hermes-bridge.py" 2>/dev/null
   || cp "$(dirname "$0")/hermes-bridge-v8.py" "$BRIDGE_DIR/hermes-bridge.py" 2>/dev/null \
   || curl -fsSL -o "$BRIDGE_DIR/hermes-bridge.py" "https://$WS_HOST/static/hermes-bridge-v8.py"
 
-# 5) 安装依赖
+# 5) 安装依赖 (PEP 668 环境加 --break-system-packages; 失败不阻断,依赖可能已存在)
 echo "==> 安装 Python 依赖..."
-pip install --quiet websocket-client requests pyyaml 2>/dev/null \
-  || pip3 install --quiet websocket-client requests pyyaml
+pip install --quiet --break-system-packages websocket-client requests pyyaml 2>/dev/null \
+  || pip3 install --quiet --break-system-packages websocket-client requests pyyaml 2>/dev/null \
+  || echo "!! 依赖安装警告: 请确认 websocket-client/requests/pyyaml 已安装"
+python3 -c "import websocket, requests, yaml" 2>/dev/null \
+  || python3 -c "import websocket, requests" 2>/dev/null \
+  || { echo "!! 依赖缺失,无法启动 bridge"; exit 1; }
 
 # 6) 注册 systemd 服务
 echo "==> 注册 systemd 服务..."
