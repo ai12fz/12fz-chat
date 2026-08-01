@@ -6,7 +6,7 @@
         <span class="name">{{ displayName }}</span>
       </div>
       <button class="logout-btn" @click="handleLogout" title="退出登录">退出</button>
-      <button v-if="auth.isAdmin" class="admin-btn" @click="goAdmin" title="设备/中转站管理">⚙ 管理</button>
+      <button class="admin-btn" @click="goAdmin" title="设备/中转站管理">⚙ 管理</button>
     </div>
     <div class="tab-bar">
       <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
