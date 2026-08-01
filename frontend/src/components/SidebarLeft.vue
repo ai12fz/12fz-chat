@@ -6,6 +6,7 @@
         <span class="name">{{ displayName }}</span>
       </div>
       <button class="logout-btn" @click="handleLogout" title="退出登录">退出</button>
+      <button v-if="auth.isAdmin" class="admin-btn" @click="goAdmin" title="设备/中转站管理">⚙ 管理</button>
     </div>
     <div class="tab-bar">
       <div class="tab" :class="{ active: activeTab === 'msg' }" @click="activeTab = 'msg'">消息</div>
@@ -149,11 +150,13 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { getFriends, listDocuments, listOrgStaff, grantFriend } from '../api'
 import AddFriendDialog from './AddFriendDialog.vue'
 
+const router = useRouter()
 const auth = useAuthStore()
 const chat = useChatStore()
 const search = ref('')
@@ -381,6 +384,7 @@ function openFriendChat(friendId: string, displayName: string, userType: string)
 }
 
 function handleLogout() { auth.logout() }
+function goAdmin() { router.push('/admin/devices') }
 
 function saveNickname() {
   if (!newNickname.value.trim()) { profileMsg.value = '名称不能为空'; return }
