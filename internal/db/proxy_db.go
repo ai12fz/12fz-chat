@@ -12,26 +12,29 @@ import (
 
 func (d *DB) ProxyDashboard(ctx context.Context, keyID string) (today map[string]interface{}, month map[string]interface{}, daily []map[string]interface{}, topModels interface{}) {
 	keyFilter := ""
+	var args []interface{}
 	if keyID != "" {
-		keyFilter = " AND key_id=" + keyID
- 	}
+		keyFilter = " AND key_id=$1"
+		args = append(args, keyID)
+	}
 
 	var tcalls, ttokens int
 	var tcost float64
+	queryArgs := append([]interface{}{}, args...)
 	d.pool.QueryRow(ctx, `SELECT COALESCE(COUNT(*),0), COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost)::numeric,0)
-		FROM chat.proxy_usage WHERE created_at::date = CURRENT_DATE`+keyFilter).Scan(&tcalls, &ttokens, &tcost)
+		FROM chat.proxy_usage WHERE created_at::date = CURRENT_DATE`+keyFilter, queryArgs...).Scan(&tcalls, &ttokens, &tcost)
 	today = map[string]interface{}{"calls": tcalls, "tokens": ttokens, "cost": tcost}
 
 	var mcalls, mtokens int
 	var mcost float64
 	d.pool.QueryRow(ctx, `SELECT COALESCE(COUNT(*),0), COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost)::numeric,0)
-		FROM chat.proxy_usage WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`+keyFilter).Scan(&mcalls, &mtokens, &mcost)
+		FROM chat.proxy_usage WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`+keyFilter, queryArgs...).Scan(&mcalls, &mtokens, &mcost)
 	month = map[string]interface{}{"calls": mcalls, "tokens": mtokens, "cost": mcost}
 
 	daily = []map[string]interface{}{}
 	rows, _ := d.pool.Query(ctx, `SELECT created_at::date::text, COUNT(*), SUM(total_tokens), SUM(cost)::numeric, model_name
 		FROM chat.proxy_usage WHERE created_at >= CURRENT_DATE - 30`+keyFilter+`
-		GROUP BY created_at::date, model_name ORDER BY created_at::date, model_name`)
+		GROUP BY created_at::date, model_name ORDER BY created_at::date, model_name`, queryArgs...)
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -63,10 +66,18 @@ func (d *DB) ProxyListModels(ctx context.Context) ([]map[string]interface{}, err
 		rows.Scan(&id, &name, &display, &provider, &endpoint, &apiKey, &status, &priority, &maxRpm)
 		out = append(out, map[string]interface{}{
 			"id": id, "name": name, "display_name": display, "provider": provider,
-			"endpoint": endpoint, "api_key": apiKey, "status": status, "priority": priority, "max_rpm": maxRpm,
+			"endpoint": endpoint, "api_key": maskSecret(apiKey), "status": status, "priority": priority, "max_rpm": maxRpm,
 		})
 	}
 	return out, nil
+}
+
+// maskSecret returns a masked form of a secret key (first 4 + last 4 chars).
+func maskSecret(s string) string {
+	if len(s) <= 8 {
+		return "***"
+	}
+	return s[:4] + "****" + s[len(s)-4:]
 }
 
 func (d *DB) ProxyCreateModel(ctx context.Context, m map[string]interface{}) error {
