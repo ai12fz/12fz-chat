@@ -9,6 +9,7 @@ type Friend struct {
 	Category  string    `json:"category,omitempty"`
 	Status    string    `json:"status"`
 	Name      string    `json:"name"`
+	Online    bool      `json:"online"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

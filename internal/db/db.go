@@ -414,7 +414,13 @@ func (d *DB) AddFriend(ctx context.Context, userID, friendID, userType string) e
 
 func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at, COALESCE(a.display_name, d.name, f.friend_id) as name FROM chat.friends f LEFT JOIN chat.agents a ON f.friend_id = a.bot_id LEFT JOIN chat.devices d ON f.friend_id = d.id WHERE f.user_id = $1",
+		`SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at, COALESCE(a.display_name, d.name, f.friend_id) as name,
+		CASE
+			WHEN d.id IS NOT NULL THEN d.status = 'online'
+			WHEN a.id IS NOT NULL THEN a.heartbeat_at > NOW() - INTERVAL '3 minutes'
+			ELSE false
+		END as online
+		FROM chat.friends f LEFT JOIN chat.agents a ON f.friend_id = a.bot_id LEFT JOIN chat.devices d ON f.friend_id = d.id WHERE f.user_id = $1`,
 		userID)
 	if err != nil {
 		return nil, err
@@ -423,7 +429,7 @@ func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, err
 	var friends []model.Friend
 	for rows.Next() {
 		var f model.Friend
-		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt, &f.Name); err != nil {
+		if err := rows.Scan(&f.UserID, &f.FriendID, &f.Status, &f.UserType, &f.Category, &f.CreatedAt, &f.Name, &f.Online); err != nil {
 			return nil, err
 		}
 		friends = append(friends, f)

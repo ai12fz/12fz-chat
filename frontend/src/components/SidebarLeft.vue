@@ -39,29 +39,25 @@
 
 
 <div class="tab-content" v-show="activeTab === 'friends'">
-      <div class="friend-tabs">
-        <div class="ftab" :class="{ active: friendTab === 'human' }" @click="friendTab = 'human'">👤 好友</div>
-        <div class="ftab" :class="{ active: friendTab === 'device' }" @click="friendTab = 'device'">🖥 主机</div>
-        <div class="ftab" :class="{ active: friendTab === 'agent' }" @click="friendTab = 'agent'">🤖 Agent</div>
-      </div>
       <nav class="session-list">
-        <div v-for="f in filteredFriends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id }" @click="openFriendChat(f.friend_id, f.name || f.friend_id, f.user_type)">
+        <div v-for="f in friends" :key="f.friend_id" class="session-item" :class="{ active: chat.activeId === 'friend:' + f.friend_id, 'offline-item': f.online === false }" @click="openFriendChat(f.friend_id, f.name || f.friend_id, f.user_type)">
           <span class="avatar sm" :style="{ background: avatarColor({name: f.name || f.friend_id}) }">{{ (f.name || f.friend_id)[0] }}</span>
           <div class="session-info">
             <div class="session-top">
-              <span class="session-name">{{ f.name || f.friend_id }}</span>
+              <span class="session-name" :class="{ 'offline-name': f.online === false }">{{ f.name || f.friend_id }}</span>
+              <span class="online-dot" :class="{ on: f.online !== false }" :title="f.online === false ? '离线' : '在线'"></span>
               <span v-if="f.user_type === 'agent' || f.user_type === 'api'" class="session-badge badge-agent">🤖 Agent</span>
               <span v-else-if="f.user_type === 'human'" class="session-badge badge-human">👤 好友</span>
               <span v-else-if="f.user_type === 'device'" class="session-badge badge-device">🖥 主机</span>
               <span v-else class="session-badge badge-human">👤 好友</span>
             </div>
-            <span class="session-msg">{{ f.status || '暂无消息' }}</span>
+            <span class="session-msg" :class="{ 'offline-name': f.online === false }">{{ f.online === false ? '离线' : (f.status || '在线') }}</span>
           </div>
           <button v-if="f.user_type === 'device' || f.user_type === 'agent'" class="grant-btn" title="授权给员工" @click.stop="openGrant(f)">授权</button>
         </div>
-        <div v-if="filteredFriends.length === 0" class="empty-hint">{{ friendTab === 'human' ? '暂无好友' : friendTab === 'device' ? '暂无主机' : '暂无Agent' }}</div>
+        <div v-if="friends.length === 0" class="empty-hint">暂无好友</div>
       </nav>
-      <div class="add-friend-bar" v-if="friendTab === 'human'">
+      <div class="add-friend-bar">
         <div class="session-item" @click="showAddFriend = true">
           <span class="avatar sm" style="background: #52c41a">+</span>
           <div class="session-info"><span class="session-name">添加好友</span></div>
@@ -165,15 +161,6 @@ const activeTab = ref('msg')
 const docs = ref<any[]>([])
 
 const friends = ref<any[]>([])
-const friendTab = ref<'human' | 'device' | 'agent'>('human')
-const filteredFriends = computed(() => {
-  return friends.value.filter((f: any) => {
-    const t = f.user_type || 'human'
-    if (friendTab.value === 'human') return t === 'human' || t === 'api'
-    return t === friendTab.value
-  })
-})
-const nonAgentFriends = computed(() => friends.value)
 const showAddFriend = ref(false)
 const showProfile = ref(false)
 const newNickname = ref('')
@@ -330,6 +317,7 @@ function formatTime(iso: string) {
     d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+// Merge backend online flag with live WS user_online/offline events (human friends are driven purely by WS)function isOnline(f: any): boolean {  const ws = chat.onlineMap[f.friend_id]  if (ws !== undefined) return ws  return f.online !== false}
 async function loadFriends() {
   // Resolve the numeric uid first. The old code read auth.user synchronously, but
   // whoami runs async in ChatView's onMounted AFTER this component's setup, so the
@@ -494,6 +482,13 @@ loadFriends()
   gap: 4px;
 }
 .session-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.online-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #d9d9d9; flex-shrink: 0; margin-left: 2px;
+}
+.online-dot.on { background: #52c41a; box-shadow: 0 0 3px rgba(82,196,26,.6); }
+.offline-item { opacity: .62; }
+.offline-name { color: #999 !important; }
 .session-badge {
   font-size: 10px;
   background: #e8e8e8;
@@ -508,6 +503,15 @@ loadFriends()
 .category-filter button.active { background: #1890ff; color: #fff; border-color: #1890ff; }
 .category-filter button:hover { border-color: #1890ff; }
 .session-badge.badge-human { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+.online-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ccc;
+  flex-shrink: 0;
+}
+.online-dot.on { background: #52c41a; box-shadow: 0 0 4px rgba(82,196,26,.6); }
+.offline-item { opacity: .62; }
+.offline-name { color: #999 !important; }
 .session-msg {
   font-size: 12px;
   color: #888;
@@ -538,28 +542,6 @@ loadFriends()
 }
 
 .add-friend-bar { border-top: 1px solid #f0f0f0; margin-top: auto; }
-
-.friend-tabs {
-  display: flex;
-  border-bottom: 1px solid #e8e8e8;
-  background: #fafafa;
-}
-.ftab {
-  flex: 1;
-  text-align: center;
-  padding: 7px 0;
-  font-size: 12px;
-  color: #666;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  user-select: none;
-}
-.ftab.active {
-  color: #1890ff;
-  font-weight: 600;
-  border-bottom-color: #1890ff;
-  background: #fff;
-}
 .grant-btn {
   flex-shrink: 0;
   font-size: 11px;
