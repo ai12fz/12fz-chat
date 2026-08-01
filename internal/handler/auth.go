@@ -42,9 +42,6 @@ func (h *AuthHandler) ValidateToken(token string) (string, error) {
 			return botID, nil
 		}
 	}
-	if strings.HasPrefix(token, "session-") {
-		return token[8:], nil
-	}
 	// Validate device tokens (d_xxx)
 	if strings.HasPrefix(token, "d_") {
 		dev, err := h.db.ValidateDeviceToken(context.Background(), token)

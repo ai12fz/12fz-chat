@@ -458,7 +458,7 @@ func (d *DB) GetFriendMessages(ctx context.Context, userID, otherID string, limi
 
 func (d *DB) UpdateFriendCategory(ctx context.Context, userID, friendID, category string) error {
 	_, err := d.pool.Exec(ctx,
-		"UPDATE chat.friends SET category =  WHERE user_id =  AND friend_id = ",
+		"UPDATE chat.friends SET category = $1 WHERE user_id = $2 AND friend_id = $3",
 		category, userID, friendID)
 	return err
 }
@@ -481,7 +481,7 @@ func (d *DB) DeleteFriend(ctx context.Context, userID, friendID string) error {
 func (d *DB) UpdateBotStatus(botID, status string) {
 	if d != nil && d.pool != nil {
 		d.pool.Exec(context.Background(),
-			"INSERT INTO chat.bot_statuses (bot_id, status, updated_at) VALUES (, , NOW()) ON CONFLICT (bot_id) DO UPDATE SET status=, updated_at=NOW()",
+			"INSERT INTO chat.bot_statuses (bot_id, status, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (bot_id) DO UPDATE SET status=$2, updated_at=NOW()",
 			botID, status)
 	}
 }

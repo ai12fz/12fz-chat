@@ -93,9 +93,6 @@ func main() {
 
 	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
 	api.HandleFunc("/users/{id}", httpHandler.GetUserInfo).Methods("GET")
-	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
-	api.HandleFunc("/users/{id}", httpHandler.GetUserInfo).Methods("GET")
-	api.HandleFunc("/whoami", httpHandler.WhoAmI).Methods("GET")
 	api.HandleFunc("/friends/action", httpHandler.HandleFriendRequest).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.SendFriendMessage).Methods("POST")
 	api.HandleFunc("/friend-messages", httpHandler.GetFriendMessages).Methods("GET")
