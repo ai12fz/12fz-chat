@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
+import { resolveChatToken } from '../utils/authToken'
 
 const GO_URL = 'https://go.12fz.com'
 
@@ -13,10 +14,12 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const urlToken = new URLSearchParams(window.location.search).get('token')
   if (urlToken) {
-    localStorage.setItem('token', urlToken)
+    // ChatPanel (go.12fz.com) 注入的是 marketplace token,必须先换成本地 JWT
+    const resolved = await resolveChatToken(urlToken)
+    localStorage.setItem('token', resolved)
     window.history.replaceState({}, '', window.location.pathname)
   }
   const token = localStorage.getItem('token')
