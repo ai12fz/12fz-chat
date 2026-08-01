@@ -84,6 +84,20 @@ func ExtractTokenFromHeader(r *http.Request) string {
 	return ""
 }
 
+func (h *AuthHandler) SignJWT(botID string, ttl time.Duration) (string, error) {
+	header := base64URLEncode([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	payloadJSON, err := json.Marshal(map[string]interface{}{
+		"bot_id": botID,
+		"exp":    time.Now().Add(ttl).Unix(),
+	})
+	if err != nil {
+		return "", err
+	}
+	payload := base64URLEncode(payloadJSON)
+	sig := hmacSHA256(header+"."+payload, h.jwtSecret)
+	return header + "." + payload + "." + sig, nil
+}
+
 func base64URLEncode(data []byte) string {
 	return strings.TrimRight(base64.URLEncoding.EncodeToString(data), "=")
 }
