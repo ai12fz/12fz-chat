@@ -21,7 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     try {
       const res = await fetch('/api/whoami', {
-        headers: { Authorization: token.value }
+        headers: { Authorization: `Bearer ${token.value}` }
       })
       if (res.ok) {
         const data = await res.json()
