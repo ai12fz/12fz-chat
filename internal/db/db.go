@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/ai12fz/12fz-chat/internal/model"
@@ -308,15 +309,30 @@ func (d *DB) ListGroupsForUser(ctx context.Context, botID string) ([]GroupWithMe
 }
 
 func (d *DB) AddMember(ctx context.Context, groupID int64, botID, role string) error {
-	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.group_members (group_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (group_id, user_id) DO UPDATE SET role = $3",
-		groupID, botID, role)
-	return err
+	// 数字 → 用户(user_id 列);非数字 → 设备/agent(bot_id 列)
+	if _, err := strconv.ParseInt(botID, 10, 64); err == nil {
+		_, err := d.pool.Exec(ctx,
+			"INSERT INTO chat.group_members (group_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (group_id, user_id) DO UPDATE SET role = $3",
+			groupID, botID, role)
+		return err
+	}
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "DELETE FROM chat.group_members WHERE group_id = $1 AND bot_id = $2", groupID, botID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO chat.group_members (group_id, bot_id, role) VALUES ($1, $2, $3)", groupID, botID, role); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (d *DB) GetMembers(ctx context.Context, groupID int64) ([]model.GroupMember, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT group_id, user_id, role, joined_at FROM chat.group_members WHERE group_id = $1",
+		"SELECT group_id, COALESCE(user_id, 0), role, joined_at, COALESCE(bot_id, '') FROM chat.group_members WHERE group_id = $1",
 		groupID)
 	if err != nil {
 		return nil, err
@@ -325,7 +341,7 @@ func (d *DB) GetMembers(ctx context.Context, groupID int64) ([]model.GroupMember
 	var members []model.GroupMember
 	for rows.Next() {
 		var m model.GroupMember
-		if err := rows.Scan(&m.GroupID, &m.UserID, &m.Role, &m.JoinedAt); err != nil {
+		if err := rows.Scan(&m.GroupID, &m.UserID, &m.Role, &m.JoinedAt, &m.BotID); err != nil {
 			return nil, err
 		}
 		members = append(members, m)

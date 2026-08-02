@@ -12,6 +12,7 @@ type Group struct {
 type GroupMember struct {
 	GroupID       int64     `json:"group_id"`
 	UserID        int64     `json:"user_id"`
+	BotID         string    `json:"bot_id,omitempty"`
 	Role          string    `json:"role"`
 	JoinedAt      time.Time `json:"joined_at"`
 	LastReadMsgID int64     `json:"last_read_msg_id,omitempty"`

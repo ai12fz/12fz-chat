@@ -147,7 +147,7 @@ func (d *DB) DeleteAgent(ctx context.Context, botID string) error {
 
 func (d *DB) GetGroupsForBot(ctx context.Context, botID string) ([]model.Group, error) {
 	rows, err := d.pool.Query(ctx,
-		"SELECT g.id, g.name, g.created_by, g.created_at FROM chat.groups g JOIN chat.group_members gm ON g.id = gm.group_id WHERE gm.user_id = $1", botID)
+		"SELECT g.id, g.name, g.created_by, g.created_at FROM chat.groups g JOIN chat.group_members gm ON g.id = gm.group_id WHERE gm.bot_id = $1", botID)
 	if err != nil { return nil, err }
 	defer rows.Close()
 	var groups []model.Group
@@ -163,11 +163,11 @@ func (d *DB) SetBotGroups(ctx context.Context, botID string, groupIDs []int64) e
 	tx, err := d.pool.Begin(ctx)
 	if err != nil { return err }
 	defer tx.Rollback(ctx)
-	_, err = tx.Exec(ctx, "DELETE FROM chat.group_members WHERE user_id = $1", botID)
+	_, err = tx.Exec(ctx, "DELETE FROM chat.group_members WHERE bot_id = $1", botID)
 	if err != nil { return err }
 	for _, gid := range groupIDs {
 		_, err = tx.Exec(ctx,
-			"INSERT INTO chat.group_members (group_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+			"INSERT INTO chat.group_members (group_id, bot_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
 			gid, botID)
 		if err != nil { return err }
 	}

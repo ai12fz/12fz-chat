@@ -77,6 +77,9 @@ func (h *MessageHandler) HandleMessage(senderID string, data json.RawMessage) {
 	var botIDs []string
 	for _, member := range members {
 		botIDs = append(botIDs, strconv.FormatInt(member.UserID, 10))
+		if member.BotID != "" {
+			botIDs = append(botIDs, member.BotID)
+		}
 	}
 	h.hub.SendToGroup(m.GroupID, broadcastData, botIDs)
 }
