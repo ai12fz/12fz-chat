@@ -59,7 +59,7 @@ export const useChatStore = defineStore('chat', () => {
       // Use the friends list to get agent IDs
       const ids = ['agent-1785267337061', 'hermes-win-qiuming']
       for (const botId of ids) {
-        const resp = await fetch('/api/agent-status?bot_id=' + botId)
+        const resp = await fetch('/api/agent-status?bot_id=' + botId, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } })
         if (!resp.ok) continue
         const data = await resp.json()
         if (data.status === 'online' || data.message) {
