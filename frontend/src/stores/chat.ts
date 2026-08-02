@@ -225,6 +225,7 @@ export const useChatStore = defineStore('chat', () => {
     setConnected,
     addAgentStatus,
     clearAgentStatus,
+    onlineMap, setOnline,
     sessions, activeId, activeSession, connected,
     groupSessionId, ensureGroupSession,
     addSession, setActive, receiveMessage, loadMessages,
