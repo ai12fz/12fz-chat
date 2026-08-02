@@ -124,12 +124,31 @@ func (d *DB) AutoMigrate(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_messages_group_id ON chat.messages(group_id)",
 		"CREATE INDEX IF NOT EXISTS idx_messages_created_at ON chat.messages(created_at)",
 
-		"CREATE TABLE IF NOT EXISTS chat.friends (" +
+		"CREATE TABLE IF NOT EXISTS chat.contacts (" +
 			"user_id TEXT NOT NULL," +
-			"friend_id TEXT NOT NULL," +
-			"status TEXT DEFAULT 'pending'," +
+			"contact_id TEXT NOT NULL," +
+			"status TEXT DEFAULT 'accepted'," +
+			"category TEXT DEFAULT '日常'," +
+			"org_id UUID," +
 			"created_at TIMESTAMPTZ DEFAULT NOW()," +
-			"PRIMARY KEY (user_id, friend_id)" +
+			"PRIMARY KEY (user_id, contact_id)" +
+			")",
+
+		"CREATE TABLE IF NOT EXISTS chat.user_agents (" +
+			"user_id TEXT NOT NULL," +
+			"agent_id TEXT NOT NULL," +
+			"category TEXT DEFAULT '日常'," +
+			"org_id UUID," +
+			"created_at TIMESTAMPTZ DEFAULT NOW()," +
+			"PRIMARY KEY (user_id, agent_id)" +
+			")",
+
+		"CREATE TABLE IF NOT EXISTS chat.user_devices (" +
+			"user_id TEXT NOT NULL," +
+			"device_id TEXT NOT NULL," +
+			"org_id UUID," +
+			"created_at TIMESTAMPTZ DEFAULT NOW()," +
+			"PRIMARY KEY (user_id, device_id)" +
 			")",
 
 		// Add last_msg_at column if it doesn't exist (for existing databases)
@@ -356,22 +375,45 @@ func (d *DB) GetOrgAdminID(ctx context.Context, orgID string) (string, error) {
 
 func (d *DB) AutoFriendDevice(ctx context.Context, userID, deviceName string) error {
 	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.friends (user_id, friend_id, status, user_type) VALUES ($1, $2, 'accepted', 'device') ON CONFLICT (user_id, friend_id) DO UPDATE SET status='accepted'",
+		"INSERT INTO chat.user_devices (user_id, device_id) VALUES ($1, $2) ON CONFLICT (user_id, device_id) DO NOTHING",
 		userID, deviceName)
 	return err
 }
 
 func (d *DB) AddFriend(ctx context.Context, userID, friendID, userType string) error {
-	_, err := d.pool.Exec(ctx,
-		"INSERT INTO chat.friends (user_id, friend_id, status, user_type) VALUES ($1, $2, 'accepted', $3) ON CONFLICT (user_id, friend_id) DO UPDATE SET user_type = $3",
-		userID, friendID, userType)
-	return err
+	switch userType {
+	case "agent":
+		_, err := d.pool.Exec(ctx,
+			"INSERT INTO chat.user_agents (user_id, agent_id) VALUES ($1, $2) ON CONFLICT (user_id, agent_id) DO NOTHING",
+			userID, friendID)
+		d.pool.Exec(ctx, "INSERT INTO chat.contacts (user_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", userID, friendID)
+		return err
+	case "device":
+		_, err := d.pool.Exec(ctx,
+			"INSERT INTO chat.user_devices (user_id, device_id) VALUES ($1, $2) ON CONFLICT (user_id, device_id) DO NOTHING",
+			userID, friendID)
+		return err
+	default:
+		_, err := d.pool.Exec(ctx,
+			"INSERT INTO chat.contacts (user_id, contact_id) VALUES ($1, $2) ON CONFLICT (user_id, contact_id) DO NOTHING",
+			userID, friendID)
+		return err
+	}
 }
 
 func (d *DB) GetFriends(ctx context.Context, userID string) ([]model.Friend, error) {
-	rows, err := d.pool.Query(ctx,
-		"SELECT f.user_id, f.friend_id, f.status, COALESCE(f.user_type, CASE WHEN a.id IS NOT NULL THEN 'agent' ELSE 'human' END) as user_type, COALESCE(f.category, E'日常') as category, f.created_at, COALESCE(a.display_name, d.name, f.friend_id) as name FROM chat.friends f LEFT JOIN chat.agents a ON f.friend_id = a.bot_id LEFT JOIN chat.devices d ON f.friend_id = d.id WHERE f.user_id = $1",
-		userID)
+	query := `SELECT user_id, contact_id, 'accepted', 'human', category, created_at, contact_id
+		FROM chat.contacts WHERE user_id = $1
+		UNION ALL
+		SELECT ua.user_id, ua.agent_id, 'accepted', 'agent', ua.category, ua.created_at, COALESCE(a.display_name, ua.agent_id)
+		FROM chat.user_agents ua LEFT JOIN chat.agents a ON a.bot_id = ua.agent_id
+		WHERE ua.user_id = $1
+		UNION ALL
+		SELECT ud.user_id, ud.device_id, 'accepted', 'device', '日常', ud.created_at, COALESCE(d.name, ud.device_id)
+		FROM chat.user_devices ud LEFT JOIN chat.devices d ON d.id = ud.device_id
+		WHERE ud.user_id = $1
+		ORDER BY created_at DESC`
+	rows, err := d.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -432,23 +474,25 @@ func (d *DB) GetFriendMessages(ctx context.Context, userID, otherID string, limi
 }
 
 
-func (d *DB) UpdateFriendCategory(ctx context.Context, userID, friendID, category string) error {
-	_, err := d.pool.Exec(ctx,
-		"UPDATE chat.friends SET category =  WHERE user_id =  AND friend_id = ",
-		category, userID, friendID)
+func (d *DB) UpdateFriendCategory(ctx context.Context, userID, friendID, userType, category string) error {
+	var err error
+	switch userType {
+	case "agent":
+		_, err = d.pool.Exec(ctx, "UPDATE chat.user_agents SET category=$1 WHERE user_id=$2 AND agent_id=$3", category, userID, friendID)
+	default:
+		_, err = d.pool.Exec(ctx, "UPDATE chat.contacts SET category=$1 WHERE user_id=$2 AND contact_id=$3", category, userID, friendID)
+	}
 	return err
 }
 func (d *DB) UpdateFriendStatus(ctx context.Context, userID, friendID, status string) error {
-	_, err := d.pool.Exec(ctx,
-		"UPDATE chat.friends SET status=$1 WHERE user_id=$2 AND friend_id=$3",
-		status, userID, friendID)
+	_, err := d.pool.Exec(ctx, "UPDATE chat.contacts SET status=$1 WHERE user_id=$2 AND contact_id=$3", status, userID, friendID)
 	return err
 }
 
 func (d *DB) DeleteFriend(ctx context.Context, userID, friendID string) error {
-	_, err := d.pool.Exec(ctx,
-		"DELETE FROM chat.friends WHERE user_id=$1 AND friend_id=$2",
-		userID, friendID)
+	d.pool.Exec(ctx, "DELETE FROM chat.contacts WHERE user_id=$1 AND contact_id=$2", userID, friendID)
+	d.pool.Exec(ctx, "DELETE FROM chat.user_agents WHERE user_id=$1 AND agent_id=$2", userID, friendID)
+	_, err := d.pool.Exec(ctx, "DELETE FROM chat.user_devices WHERE user_id=$1 AND device_id=$2", userID, friendID)
 	return err
 }
 
